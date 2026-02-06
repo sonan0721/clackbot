@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import { input, password } from '@inquirer/prompts';
+import { password } from '@inquirer/prompts';
 import { loadConfig, saveConfig } from '../config/index.js';
 import { getEnvPath, getLocalDir } from '../config/paths.js';
 import { logger } from '../utils/logger.js';
@@ -37,13 +37,6 @@ export async function loginCommand(): Promise<void> {
       if (!val.startsWith('xapp-')) return 'App Token은 xapp-로 시작해야 합니다.';
       return true;
     },
-  });
-
-  // Anthropic API Key 입력 (선택)
-  logger.blank();
-  logger.detail('API Key: https://console.anthropic.com/');
-  const anthropicKey = await password({
-    message: 'Anthropic API Key (선택, Enter로 건너뛰기):',
   });
 
   // auth.test로 Slack 토큰 검증
@@ -107,9 +100,6 @@ export async function loginCommand(): Promise<void> {
     const envLines: string[] = [];
     envLines.push(`SLACK_BOT_TOKEN=${botToken}`);
     envLines.push(`SLACK_APP_TOKEN=${appToken}`);
-    if (anthropicKey) {
-      envLines.push(`ANTHROPIC_API_KEY=${anthropicKey}`);
-    }
     envLines.push('');
 
     fs.writeFileSync(envPath, envLines.join('\n'), 'utf-8');

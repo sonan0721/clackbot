@@ -80,10 +80,6 @@ export async function initCommand(): Promise<void> {
         '# connections:write 스코프 필요',
         'SLACK_APP_TOKEN=',
         '',
-        '# Anthropic API Key',
-        '# https://console.anthropic.com/ 에서 발급',
-        'ANTHROPIC_API_KEY=',
-        '',
       ].join('\n');
       fs.writeFileSync(envExampleDest, envContent, 'utf-8');
     }
