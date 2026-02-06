@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import { password } from '@inquirer/prompts';
+import { password, confirm } from '@inquirer/prompts';
 import { loadConfig, saveConfig } from '../config/index.js';
 import { getEnvPath, getLocalDir } from '../config/paths.js';
 import { logger } from '../utils/logger.js';
@@ -12,6 +12,21 @@ export async function loginCommand(): Promise<void> {
   if (!fs.existsSync(getLocalDir(cwd))) {
     logger.error('.clackbot/ 디렉토리가 없습니다. 먼저 clackbot init을 실행하세요.');
     process.exit(1);
+  }
+
+  // 이미 로그인 되어있는지 확인
+  const existingConfig = loadConfig(cwd);
+  if (existingConfig.slack.botToken && existingConfig.slack.botName) {
+    logger.info(`이미 @${existingConfig.slack.botName} (${existingConfig.slack.teamName || '알 수 없음'})으로 로그인되어 있습니다.`);
+    const proceed = await confirm({
+      message: '새로 로그인하시겠습니까?',
+      default: false,
+    });
+    if (!proceed) {
+      logger.info('로그인을 취소했습니다.');
+      return;
+    }
+    logger.blank();
   }
 
   logger.info('Slack 토큰을 설정합니다.');
