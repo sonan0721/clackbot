@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { input } from '@inquirer/prompts';
+import { input, confirm } from '@inquirer/prompts';
+import chalk from 'chalk';
 import { getLocalDir, getToolsDir, getEnvPath } from '../config/paths.js';
 import { logger } from '../utils/logger.js';
 
@@ -90,8 +91,16 @@ export async function initCommand(): Promise<void> {
   // slack-manifest.json 동적 생성
   const manifestDest = path.join(clackbotDir, 'slack-manifest.json');
   let manifestJson = '';
+  let generateManifest = !fs.existsSync(manifestDest);
 
-  if (!fs.existsSync(manifestDest)) {
+  if (!generateManifest) {
+    generateManifest = await confirm({
+      message: 'slack-manifest.json이 이미 존재합니다. 새로 생성하시겠습니까?',
+      default: false,
+    });
+  }
+
+  if (generateManifest) {
     // 앱 이름 입력 (한글/영어 가능)
     const appName = await input({
       message: 'Slack 앱 이름 (예: Clackbot, 비서봇):',
@@ -160,7 +169,6 @@ export async function initCommand(): Promise<void> {
     fs.writeFileSync(manifestDest, manifestJson, 'utf-8');
     logger.success('.clackbot/slack-manifest.json 생성');
   } else {
-    logger.warn('.clackbot/slack-manifest.json 이미 존재합니다.');
     manifestJson = fs.readFileSync(manifestDest, 'utf-8');
   }
 
@@ -169,27 +177,27 @@ export async function initCommand(): Promise<void> {
   logger.blank();
   logger.info('다음 단계:');
   logger.blank();
-  logger.detail('1. Slack 앱을 생성하세요:');
-  logger.detail('   https://api.slack.com/apps → Create New App');
-  logger.detail('   "From an app manifest" 선택 → JSON 탭 → 아래 내용 붙여넣기:');
+  logger.detail(`${chalk.cyan.bold('1.')} Slack 앱을 생성하세요:`);
+  logger.detail(`   ${chalk.underline('https://api.slack.com/apps')} → ${chalk.yellow('Create New App')}`);
+  logger.detail(`   ${chalk.yellow('"From an app manifest"')} 선택 → ${chalk.yellow('JSON')} 탭 → 아래 내용 붙여넣기:`);
   logger.blank();
-  console.log(manifestJson);
+  console.log(chalk.gray(manifestJson));
   logger.blank();
-  logger.detail(`   또는 파일에서 복사: ${manifestDest}`);
+  logger.detail(`   또는 파일에서 복사: ${chalk.underline(manifestDest)}`);
   logger.blank();
-  logger.detail('2. 워크스페이스에 앱 설치 → Bot Token 확인');
-  logger.detail('   OAuth & Permissions → Install to Workspace');
-  logger.detail('   설치 후 Bot User OAuth Token (xoxb-...) 복사');
+  logger.detail(`${chalk.cyan.bold('2.')} 워크스페이스에 앱 설치 → Bot Token 확인`);
+  logger.detail(`   ${chalk.yellow('OAuth & Permissions')} → ${chalk.yellow('Install to Workspace')}`);
+  logger.detail(`   설치 후 ${chalk.green('Bot User OAuth Token')} (${chalk.dim('xoxb-...')}) 복사`);
   logger.blank();
-  logger.detail('3. App-Level Token 생성');
-  logger.detail('   Basic Information → App-Level Tokens → Generate Token');
-  logger.detail('   이름: 아무거나 (예: clackbot)');
-  logger.detail('   스코프: connections:write 추가 → Generate');
-  logger.detail('   생성된 토큰 (xapp-...) 복사');
+  logger.detail(`${chalk.cyan.bold('3.')} App-Level Token 생성`);
+  logger.detail(`   ${chalk.yellow('Basic Information')} → ${chalk.yellow('App-Level Tokens')} → ${chalk.yellow('Generate Token')}`);
+  logger.detail(`   이름: 아무거나 (예: clackbot)`);
+  logger.detail(`   스코프: ${chalk.green('connections:write')} 추가 → Generate`);
+  logger.detail(`   생성된 토큰 (${chalk.dim('xapp-...')}) 복사`);
   logger.blank();
-  logger.detail('4. 토큰 등록');
-  logger.detail('   clackbot login');
+  logger.detail(`${chalk.cyan.bold('4.')} 토큰 등록`);
+  logger.detail(`   ${chalk.magenta('clackbot login')}`);
   logger.blank();
-  logger.detail('5. 봇 시작');
-  logger.detail('   clackbot start');
+  logger.detail(`${chalk.cyan.bold('5.')} 봇 시작`);
+  logger.detail(`   ${chalk.magenta('clackbot start')}`);
 }

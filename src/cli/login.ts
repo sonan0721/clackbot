@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import { password, confirm } from '@inquirer/prompts';
+import { input, confirm } from '@inquirer/prompts';
 import { loadConfig, saveConfig } from '../config/index.js';
 import { getEnvPath, getLocalDir } from '../config/paths.js';
 import { logger } from '../utils/logger.js';
@@ -34,7 +34,7 @@ export async function loginCommand(): Promise<void> {
 
   // Bot Token 입력
   logger.detail('Bot Token: OAuth & Permissions → Bot User OAuth Token');
-  const botToken = await password({
+  const botToken = await input({
     message: 'Slack Bot Token (xoxb-...):',
     validate: (val) => {
       if (!val.startsWith('xoxb-')) return 'Bot Token은 xoxb-로 시작해야 합니다.';
@@ -46,7 +46,7 @@ export async function loginCommand(): Promise<void> {
   logger.blank();
   logger.detail('App Token: Basic Information → App-Level Tokens');
   logger.detail('없으면 Generate Token → connections:write 스코프 추가');
-  const appToken = await password({
+  const appToken = await input({
     message: 'Slack App Token (xapp-...):',
     validate: (val) => {
       if (!val.startsWith('xapp-')) return 'App Token은 xapp-로 시작해야 합니다.';
