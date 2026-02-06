@@ -41,6 +41,9 @@ check_prerequisites() {
   if [ "$NODE_MAJOR" -lt 18 ]; then
     fatal "Node.js 18+ 이 필요합니다. 현재: v${NODE_VERSION}"
   fi
+  if [ "$NODE_MAJOR" -ge 24 ]; then
+    fatal "Node.js 24+는 아직 지원하지 않습니다. Node.js 22 LTS를 사용하세요. 현재: v${NODE_VERSION}"
+  fi
   ok "Node.js v${NODE_VERSION}"
 
   # npm

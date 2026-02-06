@@ -33,6 +33,10 @@ function Test-Prerequisites {
         Write-Err "Node.js 18+ 이 필요합니다. 현재: v$nodeVersion"
         exit 1
     }
+    if ($nodeMajor -ge 24) {
+        Write-Err "Node.js 24+는 아직 지원하지 않습니다. Node.js 22 LTS를 사용하세요. 현재: v$nodeVersion"
+        exit 1
+    }
     Write-Ok "Node.js v$nodeVersion"
 
     # npm

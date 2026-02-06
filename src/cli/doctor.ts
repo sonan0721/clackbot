@@ -21,12 +21,15 @@ export async function doctorCommand(): Promise<void> {
   // 1. Node.js 버전 확인
   const nodeVersion = process.versions.node;
   const nodeMajor = parseInt(nodeVersion.split('.')[0], 10);
+  const nodeOk = nodeMajor >= 18 && nodeMajor < 24;
   results.push({
     name: 'Node.js 버전',
-    pass: nodeMajor >= 18,
-    message: nodeMajor >= 18
-      ? `v${nodeVersion} (18+ 필요)`
-      : `v${nodeVersion} — Node.js 18 이상이 필요합니다`,
+    pass: nodeOk,
+    message: nodeOk
+      ? `v${nodeVersion} (18~22 LTS 권장)`
+      : nodeMajor >= 24
+        ? `v${nodeVersion} — Node.js 24+는 미지원. 22 LTS를 사용하세요`
+        : `v${nodeVersion} — Node.js 18 이상이 필요합니다`,
   });
 
   // 2. .clackbot/ 디렉토리 존재
