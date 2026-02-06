@@ -16,8 +16,33 @@ export async function loginCommand(): Promise<void> {
 
   // 이미 로그인 되어있는지 확인
   const existingConfig = loadConfig(cwd);
-  if (existingConfig.slack.botToken && existingConfig.slack.botName) {
-    logger.info(`이미 @${existingConfig.slack.botName} (${existingConfig.slack.teamName || '알 수 없음'})으로 로그인되어 있습니다.`);
+  if (existingConfig.slack.botToken && existingConfig.slack.botUserId) {
+    // 저장된 토큰으로 현재 표시 이름 조회
+    let displayBotName = existingConfig.slack.botName || 'clackbot';
+    try {
+      const userRes = await fetch(`https://slack.com/api/users.info?user=${existingConfig.slack.botUserId}`, {
+        headers: { 'Authorization': `Bearer ${existingConfig.slack.botToken}` },
+      });
+      const userData = await userRes.json() as {
+        ok: boolean;
+        user?: { real_name?: string; profile?: { display_name?: string } };
+      };
+      if (userData.ok && userData.user) {
+        const name = userData.user.profile?.display_name || userData.user.real_name;
+        if (name) {
+          displayBotName = name;
+          // config에 최신 이름 동기화
+          if (displayBotName !== existingConfig.slack.botName) {
+            existingConfig.slack.botName = displayBotName;
+            saveConfig(existingConfig, cwd);
+          }
+        }
+      }
+    } catch {
+      // 네트워크 오류 시 기존 config 값 사용
+    }
+
+    logger.info(`이미 @${displayBotName} (${existingConfig.slack.teamName || '알 수 없음'})으로 로그인되어 있습니다.`);
     const proceed = await confirm({
       message: '새로 로그인하시겠습니까?',
       default: false,
