@@ -12,11 +12,13 @@ export interface HandleMessageParams {
   channelId: string;
   threadTs: string;
   threadMessages: Array<{ user: string; text: string }>;
-  say: (params: { text: string; thread_ts: string }) => Promise<unknown>;
+  say: (params: { text: string; thread_ts?: string }) => Promise<unknown>;
+  /** true면 스레드 대신 채널에 직접 응답 */
+  replyInChannel?: boolean;
 }
 
 export async function handleMessage(params: HandleMessageParams): Promise<void> {
-  const { inputText, userId, channelId, threadTs, threadMessages, say } = params;
+  const { inputText, userId, channelId, threadTs, threadMessages, say, replyInChannel } = params;
 
   try {
     const cwd = process.cwd();
@@ -42,9 +44,13 @@ export async function handleMessage(params: HandleMessageParams): Promise<void> 
       messageCount: session.messageCount + 1,
     });
 
-    // 응답 전송
+    // 응답 전송 — replyInChannel이면 채널에, 아니면 스레드에
     const responseText = truncateText(response.text);
-    await say({ text: responseText, thread_ts: threadTs });
+    if (replyInChannel) {
+      await say({ text: responseText });
+    } else {
+      await say({ text: responseText, thread_ts: threadTs });
+    }
 
     // 대화 기록 저장
     saveConversation({
@@ -61,9 +67,10 @@ export async function handleMessage(params: HandleMessageParams): Promise<void> 
   } catch (error) {
     logger.error(`메시지 처리 실패: ${error instanceof Error ? error.message : String(error)}`);
 
-    await say({
-      text: '죄송합니다. 메시지 처리 중 오류가 발생했습니다.',
-      thread_ts: threadTs,
-    });
+    if (replyInChannel) {
+      await say({ text: '죄송합니다. 메시지 처리 중 오류가 발생했습니다.' });
+    } else {
+      await say({ text: '죄송합니다. 메시지 처리 중 오류가 발생했습니다.', thread_ts: threadTs });
+    }
   }
 }
