@@ -1,6 +1,6 @@
 {
   "name": "@sonanlee/clackbot",
-  "version": "0.9.4",
+  "version": "0.9.5",
   "description": "개인 로컬 Slack 비서 — Claude Code 기반 Slack 에이전트",
   "type": "module",
   "bin": {
@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "tsx src/cli/index.ts",
-    "build": "tsc && rm -rf dist/src/web/public dist/templates && cp -r src/web/public dist/src/web/public && cp -r templates dist/templates",
+    "build": "tsc && node scripts/copy-assets.cjs",
     "start": "node dist/bin/clackbot.js start",
     "test": "vitest"
   },
