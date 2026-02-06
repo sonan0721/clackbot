@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { config as loadEnv } from 'dotenv';
-import { loadConfig } from '../config/index.js';
+import { loadConfig, saveConfig } from '../config/index.js';
 import { getLocalDir, getEnvPath } from '../config/paths.js';
 import { createSlackApp, startSlackApp } from '../slack/app.js';
 import { startWebServer } from '../web/server.js';
@@ -188,7 +188,29 @@ export async function startCommand(options: StartOptions): Promise<void> {
       await startWebServer(port);
     }
 
-    const botName = config.slack.botName || 'clackbot';
+    // Slack auth.test로 실제 봇 이름 확인 및 config 동기화
+    let botName = config.slack.botName || 'clackbot';
+    try {
+      const authRes = await fetch('https://slack.com/api/auth.test', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${botToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      const authData = await authRes.json() as { ok: boolean; user?: string; team?: string };
+      if (authData.ok && authData.user) {
+        botName = authData.user;
+        if (botName !== config.slack.botName || (authData.team && authData.team !== config.slack.teamName)) {
+          config.slack.botName = botName;
+          if (authData.team) config.slack.teamName = authData.team;
+          saveConfig(config, cwd);
+        }
+      }
+    } catch {
+      // 네트워크 오류 시 기존 config 값 사용
+    }
+
     logger.blank();
     logger.success(`봇 이름: @${botName} | 접근 모드: ${config.accessMode}`);
     if (enableWeb) {
