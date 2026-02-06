@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { config as loadEnv } from 'dotenv';
 import { loadConfig } from '../config/index.js';
 import { getLocalDir, getEnvPath } from '../config/paths.js';
@@ -22,6 +23,31 @@ export async function startCommand(options: StartOptions): Promise<void> {
   // .clackbot/ 존재 확인
   if (!fs.existsSync(getLocalDir(cwd))) {
     logger.error('.clackbot/ 디렉토리가 없습니다. 먼저 clackbot init을 실행하세요.');
+    process.exit(1);
+  }
+
+  // Claude Code 설치 확인
+  try {
+    const version = execFileSync('claude', ['--version'], {
+      encoding: 'utf-8',
+      timeout: 5000,
+    }).trim();
+    logger.success(`Claude Code 확인: ${version}`);
+  } catch {
+    logger.error('Claude Code가 설치되어 있지 않습니다.');
+    logger.detail('설치: npm install -g @anthropic-ai/claude-code');
+    process.exit(1);
+  }
+
+  // Claude Code 로그인 확인
+  try {
+    execFileSync('claude', ['-p', 'ping', '--max-turns', '1'], {
+      encoding: 'utf-8',
+      timeout: 30000,
+    });
+  } catch {
+    logger.error('Claude Code에 로그인되어 있지 않습니다.');
+    logger.detail('로그인: claude login');
     process.exit(1);
   }
 
