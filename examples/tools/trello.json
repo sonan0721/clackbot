@@ -1,0 +1,32 @@
+{
+  "name": "trello",
+  "description": "Trello 보드/카드 관리",
+  "auth": {
+    "type": "api_key",
+    "envVars": ["TRELLO_API_KEY", "TRELLO_TOKEN"]
+  },
+  "tools": [
+    {
+      "name": "trello_create_card",
+      "description": "Trello 리스트에 새 카드를 생성합니다",
+      "method": "POST",
+      "url": "https://api.trello.com/1/cards",
+      "params": {
+        "idList": { "type": "string", "description": "리스트 ID", "required": true },
+        "name": { "type": "string", "description": "카드 제목", "required": true },
+        "desc": { "type": "string", "description": "카드 설명" }
+      },
+      "authParams": { "key": "$TRELLO_API_KEY", "token": "$TRELLO_TOKEN" }
+    },
+    {
+      "name": "trello_list_cards",
+      "description": "Trello 리스트의 카드 목록을 조회합니다",
+      "method": "GET",
+      "url": "https://api.trello.com/1/lists/{idList}/cards",
+      "params": {
+        "idList": { "type": "string", "description": "리스트 ID", "required": true }
+      },
+      "authParams": { "key": "$TRELLO_API_KEY", "token": "$TRELLO_TOKEN" }
+    }
+  ]
+}

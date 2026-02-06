@@ -1,0 +1,73 @@
+import { queryAgent } from '../../agent/claude.js';
+import { sessionManager } from '../../session/manager.js';
+import { resolveProject } from '../../projects/resolver.js';
+import { saveConversation } from '../../store/conversations.js';
+import { truncateText } from '../../utils/slackFormat.js';
+import { logger } from '../../utils/logger.js';
+
+// 메시지 처리 공통 핸들러
+
+export interface HandleMessageParams {
+  inputText: string;
+  userId: string;
+  channelId: string;
+  threadTs: string;
+  threadMessages: Array<{ user: string; text: string }>;
+  say: (params: { text: string; thread_ts: string }) => Promise<unknown>;
+}
+
+export async function handleMessage(params: HandleMessageParams): Promise<void> {
+  const { inputText, userId, channelId, threadTs, threadMessages, say } = params;
+
+  try {
+    // 프로젝트 해석 (채널 → 프로젝트 매핑)
+    const project = resolveProject(channelId);
+    const cwd = project?.directory ?? process.cwd();
+
+    // 세션 관리
+    const session = sessionManager.getOrCreate(threadTs);
+
+    // "생각 중" 리액션 또는 메시지 (선택적)
+    logger.debug(`처리 시작: "${inputText.slice(0, 50)}..."`);
+
+    // Claude Agent 호출
+    const response = await queryAgent({
+      prompt: inputText,
+      cwd,
+      threadMessages,
+      sessionId: session.id,
+      resumeId: session.resumeId,
+    });
+
+    // 세션 업데이트
+    sessionManager.update(threadTs, {
+      resumeId: response.resumeId,
+      messageCount: session.messageCount + 1,
+    });
+
+    // 응답 전송
+    const responseText = truncateText(response.text);
+    await say({ text: responseText, thread_ts: threadTs });
+
+    // 대화 기록 저장
+    saveConversation({
+      channelId,
+      threadTs,
+      userId,
+      inputText,
+      outputText: response.text,
+      toolsUsed: response.toolsUsed,
+      projectId: project?.id,
+    });
+
+    logger.debug('응답 전송 완료');
+
+  } catch (error) {
+    logger.error(`메시지 처리 실패: ${error instanceof Error ? error.message : String(error)}`);
+
+    await say({
+      text: '죄송합니다. 메시지 처리 중 오류가 발생했습니다.',
+      thread_ts: threadTs,
+    });
+  }
+}

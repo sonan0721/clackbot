@@ -1,0 +1,42 @@
+{
+  "name": "github-issues",
+  "description": "GitHub Issues 관리",
+  "auth": {
+    "type": "bearer",
+    "envVars": ["GITHUB_TOKEN"]
+  },
+  "tools": [
+    {
+      "name": "github_create_issue",
+      "description": "GitHub 저장소에 새 이슈를 생성합니다",
+      "method": "POST",
+      "url": "https://api.github.com/repos/{owner}/{repo}/issues",
+      "params": {
+        "owner": { "type": "string", "description": "저장소 소유자", "required": true },
+        "repo": { "type": "string", "description": "저장소 이름", "required": true },
+        "title": { "type": "string", "description": "이슈 제목", "required": true },
+        "body": { "type": "string", "description": "이슈 본문" },
+        "labels": { "type": "string", "description": "라벨 (쉼표 구분)" }
+      },
+      "headers": {
+        "Authorization": "Bearer $GITHUB_TOKEN",
+        "Accept": "application/vnd.github.v3+json"
+      }
+    },
+    {
+      "name": "github_list_issues",
+      "description": "GitHub 저장소의 이슈 목록을 조회합니다",
+      "method": "GET",
+      "url": "https://api.github.com/repos/{owner}/{repo}/issues",
+      "params": {
+        "owner": { "type": "string", "description": "저장소 소유자", "required": true },
+        "repo": { "type": "string", "description": "저장소 이름", "required": true },
+        "state": { "type": "string", "description": "이슈 상태 (open/closed/all)" }
+      },
+      "headers": {
+        "Authorization": "Bearer $GITHUB_TOKEN",
+        "Accept": "application/vnd.github.v3+json"
+      }
+    }
+  ]
+}

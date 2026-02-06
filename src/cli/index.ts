@@ -1,0 +1,104 @@
+import { Command } from 'commander';
+import { initCommand } from './init.js';
+import { loginCommand } from './login.js';
+import { startCommand } from './start.js';
+import { doctorCommand } from './doctor.js';
+
+// CLI 프로그램 정의
+const program = new Command();
+
+program
+  .name('clackbot')
+  .description('개인 로컬 Slack 비서 — Claude Code 기반 Slack 에이전트')
+  .version('0.1.0');
+
+// init — 스캐폴딩
+program
+  .command('init')
+  .description('프로젝트 초기화 (.clackbot/ 폴더, .env.example 생성)')
+  .action(initCommand);
+
+// login — Slack 토큰 설정
+program
+  .command('login')
+  .description('Slack 토큰 설정 및 검증')
+  .action(loginCommand);
+
+// start — 봇 + 웹 대시보드 기동
+program
+  .command('start')
+  .description('Slack 봇과 웹 대시보드를 시작합니다')
+  .option('--no-web', '웹 대시보드 없이 봇만 시작')
+  .option('--port <number>', '웹 대시보드 포트 지정', '3847')
+  .action(startCommand);
+
+// doctor — 진단
+program
+  .command('doctor')
+  .description('환경 및 설정 진단')
+  .action(doctorCommand);
+
+// config set — 설정 변경
+program
+  .command('config')
+  .description('설정 관리')
+  .command('set <key> <value>')
+  .description('설정값 변경 (예: accessMode public)')
+  .action(async (key: string, value: string) => {
+    const { configSetCommand } = await import('./configSet.js');
+    await configSetCommand(key, value);
+  });
+
+// project 명령어 그룹
+const projectCmd = program
+  .command('project')
+  .description('프로젝트 관리');
+
+projectCmd
+  .command('add <id> <directory>')
+  .description('프로젝트 등록')
+  .action(async (id: string, directory: string) => {
+    const { projectAddCommand } = await import('./projectCli.js');
+    await projectAddCommand(id, directory);
+  });
+
+projectCmd
+  .command('list')
+  .description('등록된 프로젝트 목록')
+  .action(async () => {
+    const { projectListCommand } = await import('./projectCli.js');
+    await projectListCommand();
+  });
+
+projectCmd
+  .command('map <id> <channelId>')
+  .description('프로젝트에 Slack 채널 매핑')
+  .action(async (id: string, channelId: string) => {
+    const { projectMapCommand } = await import('./projectCli.js');
+    await projectMapCommand(id, channelId);
+  });
+
+// tool 명령어 그룹
+const toolCmd = program
+  .command('tool')
+  .description('플러그인 툴 관리');
+
+toolCmd
+  .command('list')
+  .description('등록된 플러그인 목록')
+  .action(async () => {
+    const { toolListCommand } = await import('./toolCli.js');
+    await toolListCommand();
+  });
+
+toolCmd
+  .command('validate')
+  .description('플러그인 JSON 검증')
+  .action(async () => {
+    const { toolValidateCommand } = await import('./toolCli.js');
+    await toolValidateCommand();
+  });
+
+export function run(): void {
+  program.parse();
+}

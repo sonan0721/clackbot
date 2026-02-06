@@ -1,0 +1,40 @@
+{
+  "name": "jira",
+  "description": "Jira 이슈 관리",
+  "auth": {
+    "type": "api_key",
+    "envVars": ["JIRA_HOST", "JIRA_EMAIL", "JIRA_API_TOKEN"]
+  },
+  "tools": [
+    {
+      "name": "jira_create_issue",
+      "description": "Jira 프로젝트에 새 이슈를 생성합니다",
+      "method": "POST",
+      "url": "https://{host}/rest/api/3/issue",
+      "params": {
+        "projectKey": { "type": "string", "description": "프로젝트 키 (예: PROJ)", "required": true },
+        "summary": { "type": "string", "description": "이슈 제목", "required": true },
+        "description": { "type": "string", "description": "이슈 설명" },
+        "issueType": { "type": "string", "description": "이슈 유형 (Task/Bug/Story)" }
+      },
+      "headers": {
+        "Authorization": "Basic $JIRA_AUTH_BASE64",
+        "Accept": "application/json"
+      }
+    },
+    {
+      "name": "jira_search_issues",
+      "description": "JQL로 Jira 이슈를 검색합니다",
+      "method": "GET",
+      "url": "https://{host}/rest/api/3/search",
+      "params": {
+        "jql": { "type": "string", "description": "JQL 검색 쿼리", "required": true },
+        "maxResults": { "type": "number", "description": "최대 결과 수" }
+      },
+      "headers": {
+        "Authorization": "Basic $JIRA_AUTH_BASE64",
+        "Accept": "application/json"
+      }
+    }
+  ]
+}

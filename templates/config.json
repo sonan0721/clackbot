@@ -1,0 +1,10 @@
+{
+  "slack": {},
+  "accessMode": "owner",
+  "session": {
+    "maxMessages": 20,
+    "timeoutMinutes": 30
+  },
+  "webPort": 3847,
+  "projects": []
+}
