@@ -82,36 +82,51 @@ function Build-Project {
     Pop-Location
 }
 
-# ─── PATH에 추가 ─────────────────────────────────────────────────────────────
+# ─── CMD 래퍼 생성 + PATH 추가 ────────────────────────────────────────────────
 function Add-ToPath {
-    $binDir = "$InstallDir\dist\bin"
+    $jsEntry = "$InstallDir\dist\bin\clackbot.js"
 
-    # 현재 사용자 PATH 확인
-    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-    if ($userPath -split ";" | Where-Object { $_ -eq $binDir }) {
-        Write-Ok "$binDir 은 이미 PATH에 있습니다."
-        return
+    # .clackbot-cli\bin 디렉토리에 .cmd 래퍼 생성
+    $wrapperDir = "$InstallDir\bin"
+    if (-not (Test-Path $wrapperDir)) {
+        New-Item -ItemType Directory -Path $wrapperDir -Force | Out-Null
     }
 
-    # PATH에 추가
-    $newPath = "$binDir;$userPath"
-    [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
-    $env:Path = "$binDir;$env:Path"
-    Write-Ok "PATH에 추가: $binDir"
-    Write-Warn "새 터미널에서 적용됩니다."
+    # clackbot.cmd — Command Prompt / PowerShell 용
+    $cmdContent = "@echo off`r`nnode `"$jsEntry`" %*"
+    Set-Content -Path "$wrapperDir\clackbot.cmd" -Value $cmdContent -Encoding ASCII
+    Write-Ok "CMD 래퍼 생성: $wrapperDir\clackbot.cmd"
+
+    # 현재 사용자 PATH 확인 — 기존 dist\bin 제거, wrapper 디렉토리 추가
+    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    $oldBinDir = "$InstallDir\dist\bin"
+
+    # 기존 dist\bin PATH 항목 제거 (있으면)
+    $pathParts = ($userPath -split ";") | Where-Object { $_ -ne $oldBinDir -and $_ -ne "" }
+
+    if ($pathParts -contains $wrapperDir) {
+        Write-Ok "$wrapperDir 은 이미 PATH에 있습니다."
+    } else {
+        $pathParts = @($wrapperDir) + $pathParts
+        $newPath = $pathParts -join ";"
+        [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
+        $env:Path = "$wrapperDir;$env:Path"
+        Write-Ok "PATH에 추가: $wrapperDir"
+        Write-Warn "새 터미널에서 적용됩니다."
+    }
 }
 
 # ─── 검증 ────────────────────────────────────────────────────────────────────
 function Test-Installation {
     Write-Info "설치 확인 중..."
 
-    $clackbotPath = "$InstallDir\dist\bin\clackbot.js"
-    if (Test-Path $clackbotPath) {
+    $cmdPath = "$InstallDir\bin\clackbot.cmd"
+    if (Test-Path $cmdPath) {
         try {
-            $version = node $clackbotPath --version 2>$null
+            $version = & $cmdPath --version 2>$null
             Write-Ok "clackbot v$version"
         } catch {
-            Write-Ok "clackbot 설치됨 — $clackbotPath"
+            Write-Ok "clackbot 설치됨 — $cmdPath"
         }
     } else {
         Write-Warn "clackbot 엔트리포인트를 찾을 수 없습니다."
