@@ -83,8 +83,11 @@ clackbot/
 ## 4) 설치 및 사용 플로우
 
 ```bash
+# 0) 설치
+curl -fsSL https://raw.githubusercontent.com/sonan0721/clackbot/main/install.sh | sh
+
 # 1) 초기화
-npx @sonanlee/clackbot init
+clackbot init
 
 # 2) Slack 토큰 설정
 clackbot login

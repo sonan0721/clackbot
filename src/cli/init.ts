@@ -12,6 +12,8 @@ export async function initCommand(): Promise<void> {
   const clackbotDir = getLocalDir(cwd);
   const toolsDir = getToolsDir(cwd);
 
+  const templatesDir = path.resolve(__dirname, '../../templates');
+
   logger.info('Clackbot 프로젝트를 초기화합니다...');
   logger.blank();
 
@@ -32,8 +34,6 @@ export async function initCommand(): Promise<void> {
   // config.json 복사
   const configDest = path.join(clackbotDir, 'config.json');
   if (!fs.existsSync(configDest)) {
-    // 패키지 내 templates/ 경로 탐색
-    const templatesDir = path.resolve(__dirname, '../../templates');
     const configSrc = path.join(templatesDir, 'config.json');
 
     if (fs.existsSync(configSrc)) {
@@ -64,7 +64,6 @@ export async function initCommand(): Promise<void> {
   // .env.example 복사
   const envExampleDest = path.join(cwd, '.env.example');
   if (!fs.existsSync(envExampleDest)) {
-    const templatesDir = path.resolve(__dirname, '../../templates');
     const envSrc = path.join(templatesDir, '.env.example');
 
     if (fs.existsSync(envSrc)) {
@@ -91,24 +90,36 @@ export async function initCommand(): Promise<void> {
     logger.success('.env.example 생성');
   }
 
+  // slack-manifest.json 복사
+  const manifestDest = path.join(clackbotDir, 'slack-manifest.json');
+  if (!fs.existsSync(manifestDest)) {
+    const manifestSrc = path.join(templatesDir, 'slack-manifest.json');
+    if (fs.existsSync(manifestSrc)) {
+      fs.copyFileSync(manifestSrc, manifestDest);
+    }
+    logger.success('.clackbot/slack-manifest.json 생성');
+  }
+
   logger.blank();
   logger.success('초기화 완료!');
   logger.blank();
   logger.info('다음 단계:');
   logger.detail('1. Slack 앱을 생성하세요:');
-  logger.detail('   https://api.slack.com/apps');
+  logger.detail('   https://api.slack.com/apps → Create New App');
   logger.detail('');
-  logger.detail('   필요한 Bot Token Scopes:');
-  logger.detail('   app_mentions:read, channels:history, channels:read,');
-  logger.detail('   chat:write, groups:history, groups:read,');
-  logger.detail('   im:history, im:read, im:write, reactions:write, users:read');
+  logger.detail('   [방법 A] Manifest로 한번에 설정 (추천):');
+  logger.detail('   "From an app manifest" 선택 → JSON 탭 →');
+  logger.detail(`   ${manifestDest} 내용을 붙여넣기`);
   logger.detail('');
-  logger.detail('   Event Subscriptions:');
-  logger.detail('   app_mention, message.im');
+  logger.detail('   [방법 B] 수동 설정:');
+  logger.detail('   "From scratch" 선택 후 아래 항목 설정:');
+  logger.detail('   - Socket Mode: 활성화');
+  logger.detail('   - Bot Token Scopes: app_mentions:read, channels:history,');
+  logger.detail('     channels:read, chat:write, groups:history, groups:read,');
+  logger.detail('     im:history, im:read, im:write, reactions:write, users:read');
+  logger.detail('   - Event Subscriptions: app_mention, message.im');
   logger.detail('');
-  logger.detail('   Socket Mode: 활성화 필수');
-  logger.detail('');
-  logger.detail('2. .env 파일에 토큰을 설정하거나 다음 명령어를 실행하세요:');
+  logger.detail('2. 앱 설치 후 토큰을 설정하세요:');
   logger.detail('   clackbot login');
   logger.detail('');
   logger.detail('3. 봇을 시작하세요:');

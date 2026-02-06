@@ -29,14 +29,24 @@ Clackbot은 로컬 머신에서 실행되며, Claude Code Agent SDK를 사용하
    - `app_mention`, `message.im`
 6. 워크스페이스에 앱 설치 → Bot Token (`xoxb-...`) 확인
 
-### 2. Clackbot 설치 및 설정
+### 2. Clackbot 설치
+
+```bash
+# macOS / Linux
+curl -fsSL https://raw.githubusercontent.com/sonan0721/clackbot/main/install.sh | sh
+
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/sonan0721/clackbot/main/install.ps1 | iex
+```
+
+### 3. 초기화 및 Slack 토큰 설정
 
 ```bash
 # 프로젝트 디렉토리에서 초기화
-npx @sonanlee/clackbot init
+clackbot init
 
 # Slack 토큰 설정 (대화형)
-npx @sonanlee/clackbot login
+clackbot login
 
 # 또는 .env 파일 직접 편집
 # SLACK_BOT_TOKEN=xoxb-...
@@ -44,22 +54,40 @@ npx @sonanlee/clackbot login
 # ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-### 3. 봇 실행
+### 4. 봇 실행
 
 ```bash
 # 봇 + 웹 대시보드 시작
-npx @sonanlee/clackbot start
+clackbot start
 
 # 대시보드 없이 봇만 시작
-npx @sonanlee/clackbot start --no-web
+clackbot start --no-web
 
 # 포트 지정
-npx @sonanlee/clackbot start --port 4000
+clackbot start --port 4000
 ```
 
 실행 후:
 - Slack에서 `@봇이름 안녕` 메시지를 보내면 응답이 옵니다
 - `http://localhost:3847` 에서 대시보드를 확인할 수 있습니다
+
+### 업데이트
+
+설치 스크립트를 다시 실행하면 자동으로 최신 버전으로 업데이트됩니다.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/sonan0721/clackbot/main/install.sh | sh
+```
+
+### 삭제
+
+```bash
+# macOS / Linux
+curl -fsSL https://raw.githubusercontent.com/sonan0721/clackbot/main/uninstall.sh | sh
+
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/sonan0721/clackbot/main/uninstall.ps1 | iex
+```
 
 ---
 
