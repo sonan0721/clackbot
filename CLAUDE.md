@@ -23,13 +23,14 @@ Clackbot은 사용자의 **로컬 머신**에서 실행되며, **Claude Code Age
 
 - 로컬에서 실행 (Socket Mode)
 - **Claude Code Agent SDK** `query()`로 응답 생성
-- 프로젝트별 CLAUDE.md / rules.md 참조
-- 플러그인 MCP 도구 사용 가능
+- CLAUDE.md / rules.md 참조
+- MCP 서버 + 플러그인 도구 사용 가능
 
 ### 출력
 
-- Slack 스레드에 응답 게시
-- MCP 도구를 통한 외부 서비스 연동 (Trello, GitHub, Jira 등)
+- owner 모드: Slack 스레드에 응답 게시
+- public 모드: 채널 멘션 시 채널에 직접 응답, 스레드 내에서는 스레드 응답
+- MCP 도구를 통한 외부 서비스 연동
 
 ---
 
@@ -55,25 +56,27 @@ Clackbot은 사용자의 **로컬 머신**에서 실행되며, **Claude Code Age
 clackbot/
 ├── bin/clackbot.ts              # CLI 엔트리포인트
 ├── src/
-│   ├── cli/                     # CLI 명령어 (init, login, start, doctor 등)
+│   ├── cli/                     # CLI 명령어 (init, login, start, doctor)
 │   ├── slack/                   # Slack Bolt App
 │   │   ├── app.ts               # Bolt App 팩토리 (Socket Mode)
+│   │   ├── client.ts            # 공유 Slack 클라이언트 싱글턴
 │   │   ├── listeners/           # 이벤트 핸들러 (appMention, directMessage)
 │   │   └── middleware/          # 접근 제어 (owner/public 모드)
 │   ├── agent/                   # Claude Agent SDK 연동
 │   │   ├── claude.ts            # query() 래퍼
-│   │   ├── systemPrompt.ts      # CLAUDE.md + rules → 시스템 프롬프트
+│   │   ├── systemPrompt.ts      # 규칙 + 성격 프리셋 → 시스템 프롬프트
 │   │   ├── permissions.ts       # canUseTool 안전 정책
-│   │   └── tools/               # MCP 도구 (내장 + 플러그인 로더)
+│   │   ├── installer.ts         # 플러그인 설치 전용 에이전트
+│   │   └── tools/               # MCP 도구 (내장 + MCP 서버 + 플러그인 로더)
 │   ├── web/                     # 웹 대시보드 (Express + SPA)
 │   │   ├── server.ts
-│   │   ├── api/                 # REST API (tools, conversations, config, projects)
+│   │   ├── api/                 # REST API + SSE (tools, conversations, config, console, slack)
 │   │   └── public/              # 프론트엔드 (index.html, app.js, style.css)
-│   ├── store/conversations.ts   # SQLite 대화 이력
-│   ├── projects/                # 멀티 프로젝트 관리
+│   ├── store/conversations.ts   # SQLite 대화 이력 (세션별 그룹핑)
 │   ├── session/manager.ts       # 세션 생명주기 (자동 리셋)
 │   ├── config/                  # Zod 스키마, 경로, 설정 로더
 │   └── utils/                   # 로거, Slack 포맷 유틸
+├── scripts/                     # 빌드 스크립트 (크로스 플랫폼)
 ├── templates/                   # clackbot init 복사 템플릿
 └── examples/tools/              # 플러그인 JSON 예제 (Trello, GitHub, Jira)
 ```
@@ -84,9 +87,12 @@ clackbot/
 
 ```bash
 # 0) 설치
+# macOS/Linux
 curl -fsSL https://raw.githubusercontent.com/sonan0721/clackbot/main/install.sh | sh
+# Windows
+irm https://raw.githubusercontent.com/sonan0721/clackbot/main/install.ps1 | iex
 
-# 1) 초기화
+# 1) 초기화 (인터랙티브 Slack manifest 생성)
 clackbot init
 
 # 2) Slack 토큰 설정
@@ -106,13 +112,12 @@ clackbot start
 Slack @봇이름 멘션/DM
   → Bolt App (Socket Mode)
   → accessControl (owner/public 모드)
-  → ProjectResolver (채널 → 프로젝트 매핑)
   → SessionManager (스레드별 세션, 자동 리셋)
   → 스레드 컨텍스트 조회 (conversations.replies)
   → 대화 기록 저장 (SQLite)
   → Agent SDK query({ prompt, cwd, mcpServers, canUseTool, resume })
   → Claude → MCP 도구 호출 (slack_post, 플러그인 등)
-  → 응답 저장 → Slack 스레드에 say()
+  → 응답 저장 → Slack에 say()
 ```
 
 ---
@@ -122,49 +127,62 @@ Slack @봇이름 멘션/DM
 | 모드 | 동작 |
 |------|------|
 | `"owner"` (기본) | 소유자만 응답, 다른 사용자에게 안내 메시지 |
-| `"public"` | 누구나 @봇이름 멘션으로 사용 가능 |
+| `"public"` | 누구나 @봇이름 멘션으로 사용 가능. 채널 멘션 시 채널에 직접 응답 |
 
 변경: `clackbot config set accessMode public` 또는 대시보드 설정
 
 ---
 
-## 7) 플러그인 툴 시스템
+## 7) 성격 프리셋
 
-`.clackbot/tools/*.json`에 JSON 정의 파일을 추가하면 자동으로 MCP 도구로 등록됩니다.
+config의 `personality.preset`으로 응답 스타일 선택:
 
-```json
-{
-  "name": "trello",
-  "description": "Trello 보드/카드 관리",
-  "auth": { "type": "api_key", "envVars": ["TRELLO_API_KEY", "TRELLO_TOKEN"] },
-  "tools": [{
-    "name": "trello_create_card",
-    "description": "Trello 리스트에 새 카드를 생성합니다",
-    "method": "POST",
-    "url": "https://api.trello.com/1/cards",
-    "params": { "idList": { "type": "string", "required": true }, "name": { "type": "string", "required": true } },
-    "authParams": { "key": "$TRELLO_API_KEY", "token": "$TRELLO_TOKEN" }
-  }]
-}
-```
+| 프리셋 | 톤 |
+|--------|------|
+| `professional` (기본) | 간결하고 명확. 3~5줄. 불릿 포인트. 이모지 지양. |
+| `friendly` | 친근한 동료 톤. 이모지 적절히 사용. 캐주얼. |
+| `detailed` | 꼼꼼하고 상세. 배경 설명 포함. 5~15줄. 단계별 안내. |
+| `custom` | config.personality.customPrompt 그대로 사용 |
 
 ---
 
-## 8) 웹 대시보드
+## 8) 플러그인 시스템
+
+### MCP 서버 (권장)
+
+대시보드 콘솔에서 자연어로 검색/설치. config.json의 `mcpServers`에 저장:
+```json
+{
+  "mcpServers": {
+    "trello": {
+      "command": "npx",
+      "args": ["-y", "@trello/mcp-server"],
+      "env": { "TRELLO_API_KEY": "..." }
+    }
+  }
+}
+```
+
+### JSON 플러그인 (레거시)
+
+`.clackbot/tools/*.json`에 JSON 정의 파일을 추가하면 자동으로 MCP 도구로 등록.
+
+---
+
+## 9) 웹 대시보드
 
 `clackbot start` 시 http://localhost:3847 에서 접근 가능.
 
 | 페이지 | 내용 |
 |--------|------|
 | 홈 | 봇 상태, 최근 대화 요약 |
-| 대화 이력 | 채널별 대화 목록, 검색, 페이지네이션 |
-| 연동 툴 | 내장 도구 + 플러그인 목록, 인증 상태 |
-| 프로젝트 | 등록된 프로젝트, 채널 매핑 |
-| 설정 | 접근 모드, 세션 설정, 봇 정보 |
+| 대화 이력 | 세션(스레드)별 대화 목록, 클릭 시 상세 보기, 검색 |
+| 연동 툴 | 내장 도구 + MCP 서버 목록, 인터랙티브 설치 콘솔 |
+| 설정 | 접근 모드, 성격 프리셋, 세션 설정, 소유자 지정 |
 
 ---
 
-## 9) 안전 정책 (canUseTool)
+## 10) 안전 정책 (canUseTool)
 
 | 허용 | 차단 |
 |------|------|
@@ -173,7 +191,7 @@ Slack @봇이름 멘션/DM
 
 ---
 
-## 10) 세션 관리
+## 11) 세션 관리
 
 - 스레드별 세션 ID 유지 (Agent SDK `resume` 파라미터)
 - 자동 리셋: 메시지 20개 초과 / 30분 경과
@@ -181,17 +199,13 @@ Slack @봇이름 멘션/DM
 
 ---
 
-## 11) 성격 규칙
+## 12) 성격 규칙
 
 ### 규칙 우선순위
 
 1. `./CLAUDE.md` (이 파일)
 2. `./rules.md`
 3. `./.clackbot/rules.md`
-
-### 기본 톤
-
-- 전문적, 간결, 도움이 되는, 비장식적
 
 ### Slack 메시지 구조
 
@@ -202,19 +216,19 @@ Slack @봇이름 멘션/DM
 
 ### 포맷 규칙
 
-- 기본 3~10줄, 불릿 사용, 이모지 과다 지양
+- 성격 프리셋에 따라 톤 조절
 - 비꼬기/수동적 공격/공개적 비난 금지
 
 ---
 
-## 12) 안전 및 확인 정책
+## 13) 안전 및 확인 정책
 
 메시지 전송 전 **반드시 확인**이 필요한 경우:
 - 회사 민감 정보, HR/성과/보상 관련, 갈등 확대, 강한 약속이 포함된 팀 공지
 
 ---
 
-## 13) 메모리 정책
+## 14) 메모리 정책
 
 - 로컬 전용 (`.clackbot/memory.md`)
 - 사용자가 명시적으로 요청하거나 안정적인 사실을 진술할 때만 업데이트
@@ -222,7 +236,7 @@ Slack @봇이름 멘션/DM
 
 ---
 
-## 14) 금지 행동
+## 15) 금지 행동
 
 - 사실 지어내기
 - 권한 주장
@@ -231,22 +245,21 @@ Slack @봇이름 멘션/DM
 
 ---
 
-## 15) CLI 명령어
+## 16) CLI 명령어
 
 | 명령어 | 설명 |
 |--------|------|
-| `clackbot init` | 스캐폴딩 (.clackbot/, .env.example) |
+| `clackbot init` | 스캐폴딩 (인터랙티브 manifest 생성) |
 | `clackbot login` | Slack 토큰 설정/검증 |
-| `clackbot start` | 봇 + 대시보드 시작 |
+| `clackbot start` | 봇 + 대시보드 시작 (자동 업데이트 포함) |
 | `clackbot start --no-web` | 봇만 시작 |
 | `clackbot doctor` | 환경/설정 진단 |
 | `clackbot config set <key> <value>` | 설정 변경 |
-| `clackbot project add/list/map` | 프로젝트 관리 |
 | `clackbot tool list/validate` | 플러그인 관리 |
 
 ---
 
-## 16) Slack 앱 필요 권한
+## 17) Slack 앱 필요 권한
 
 **Bot Token Scopes**: `app_mentions:read`, `channels:history`, `channels:read`, `chat:write`, `groups:history`, `groups:read`, `im:history`, `im:read`, `im:write`, `reactions:write`, `users:read`
 
