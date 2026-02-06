@@ -159,22 +159,22 @@ verify() {
 
 # ─── 다음 단계 안내 ──────────────────────────────────────────────────────────
 print_next_steps() {
-  echo ""
+  printf "\n"
   printf "${BOLD}${GREEN}Clackbot 설치 완료!${RESET}\n"
-  echo ""
-  echo "다음 단계:"
-  echo ""
-  echo "  1. 프로젝트 디렉토리에서 초기화:"
-  echo "     ${CYAN}clackbot init${RESET}"
-  echo ""
-  echo "  2. Slack 토큰 설정:"
-  echo "     ${CYAN}clackbot login${RESET}"
-  echo ""
-  echo "  3. 봇 실행:"
-  echo "     ${CYAN}clackbot start${RESET}"
-  echo ""
-  echo "문서: ${CYAN}https://github.com/sonan0721/clackbot${RESET}"
-  echo ""
+  printf "\n"
+  printf "다음 단계:\n"
+  printf "\n"
+  printf "  1. 프로젝트 디렉토리에서 초기화:\n"
+  printf "     ${CYAN}clackbot init${RESET}\n"
+  printf "\n"
+  printf "  2. Slack 토큰 설정:\n"
+  printf "     ${CYAN}clackbot login${RESET}\n"
+  printf "\n"
+  printf "  3. 봇 실행:\n"
+  printf "     ${CYAN}clackbot start${RESET}\n"
+  printf "\n"
+  printf "문서: ${CYAN}https://github.com/sonan0721/clackbot${RESET}\n"
+  printf "\n"
 }
 
 # ─── 메인 ────────────────────────────────────────────────────────────────────
