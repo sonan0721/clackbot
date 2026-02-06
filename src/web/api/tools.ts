@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { loadPluginTools } from '../../agent/tools/loader.js';
 import { getToolsDir } from '../../config/paths.js';
+import { loadConfig } from '../../config/index.js';
 
 // GET /api/tools — 연동 툴 목록
 
@@ -8,6 +9,7 @@ const router = Router();
 
 router.get('/', (_req, res) => {
   const toolsDir = getToolsDir();
+  const config = loadConfig();
 
   // 내장 도구
   const builtinTools = [
@@ -31,11 +33,20 @@ router.get('/', (_req, res) => {
     },
   ];
 
-  // 플러그인 도구
+  // config.mcpServers에서 설치된 MCP 서버
+  const mcpServers = Object.entries(config.mcpServers || {}).map(([name, server]) => ({
+    name,
+    command: server.command,
+    args: server.args,
+    env: server.env ? Object.keys(server.env) : [],
+    type: 'mcp' as const,
+    status: 'active' as const,
+  }));
+
+  // 플러그인 JSON 도구 (하위 호환)
   const plugins = loadPluginTools(toolsDir);
   const pluginTools = plugins.flatMap(plugin =>
     plugin.tools.map(t => {
-      // 인증 환경변수 확인
       const envVars = plugin.auth?.envVars ?? [];
       const authOk = envVars.every(v => !!process.env[v]);
 
@@ -52,8 +63,9 @@ router.get('/', (_req, res) => {
 
   res.json({
     builtin: builtinTools,
+    mcpServers,
     plugins: pluginTools,
-    total: builtinTools.length + pluginTools.length,
+    total: builtinTools.length + mcpServers.length + pluginTools.length,
   });
 });
 

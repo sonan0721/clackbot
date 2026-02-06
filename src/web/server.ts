@@ -6,7 +6,8 @@ import { logger } from '../utils/logger.js';
 import toolsRouter from './api/tools.js';
 import conversationsRouter from './api/conversations.js';
 import configRouter from './api/config.js';
-import projectsRouter from './api/projects.js';
+import consoleRouter from './api/console.js';
+import slackRouter from './api/slack.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -42,7 +43,8 @@ export function createWebServer() {
   app.use('/api/tools', toolsRouter);
   app.use('/api/conversations', conversationsRouter);
   app.use('/api/config', configRouter);
-  app.use('/api/projects', projectsRouter);
+  app.use('/api/console', consoleRouter);
+  app.use('/api/slack', slackRouter);
 
   // 정적 파일 서빙 (대시보드 프론트엔드)
   const publicDir = path.resolve(__dirname, 'public');

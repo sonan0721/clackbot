@@ -3,7 +3,7 @@ import { logger } from '../utils/logger.js';
 
 // clackbot config set <key> <value> — 설정 변경
 
-const ALLOWED_KEYS = ['accessMode', 'webPort', 'ownerUserId'] as const;
+const ALLOWED_KEYS = ['accessMode', 'webPort', 'ownerUserId', 'session.maxMessages', 'session.timeoutMinutes'] as const;
 
 export async function configSetCommand(key: string, value: string): Promise<void> {
   if (!ALLOWED_KEYS.includes(key as typeof ALLOWED_KEYS[number])) {
@@ -23,7 +23,7 @@ export async function configSetCommand(key: string, value: string): Promise<void
       config.accessMode = value;
       break;
 
-    case 'webPort':
+    case 'webPort': {
       const port = parseInt(value, 10);
       if (isNaN(port) || port < 1 || port > 65535) {
         logger.error('webPort는 1~65535 사이의 숫자여야 합니다.');
@@ -31,10 +31,31 @@ export async function configSetCommand(key: string, value: string): Promise<void
       }
       config.webPort = port;
       break;
+    }
 
     case 'ownerUserId':
       config.ownerUserId = value;
       break;
+
+    case 'session.maxMessages': {
+      const v = parseInt(value, 10);
+      if (isNaN(v) || v < 1 || v > 1000) {
+        logger.error('session.maxMessages는 1~1000 사이의 정수여야 합니다.');
+        process.exit(1);
+      }
+      config.session = { ...config.session, maxMessages: v };
+      break;
+    }
+
+    case 'session.timeoutMinutes': {
+      const v = parseInt(value, 10);
+      if (isNaN(v) || v < 1 || v > 1440) {
+        logger.error('session.timeoutMinutes는 1~1440 사이의 정수여야 합니다.');
+        process.exit(1);
+      }
+      config.session = { ...config.session, timeoutMinutes: v };
+      break;
+    }
   }
 
   saveConfig(config);

@@ -8,6 +8,7 @@ import { createSlackApp, startSlackApp } from '../slack/app.js';
 import { startWebServer } from '../web/server.js';
 import { initDatabase, closeDatabase } from '../store/conversations.js';
 import { setSlackClient } from '../agent/tools/builtin/slackPost.js';
+import { setSharedSlackClient } from '../slack/client.js';
 import { sessionManager } from '../session/manager.js';
 import { logger } from '../utils/logger.js';
 
@@ -174,8 +175,9 @@ export async function startCommand(options: StartOptions): Promise<void> {
     // Slack 앱 생성 및 시작
     const app = createSlackApp({ botToken, appToken });
 
-    // Slack 클라이언트를 내장 도구에 주입
+    // Slack 클라이언트를 내장 도구 및 공유 싱글턴에 주입
     setSlackClient(app.client as unknown as Parameters<typeof setSlackClient>[0]);
+    setSharedSlackClient(app.client);
 
     await startSlackApp(app);
 

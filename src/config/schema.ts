@@ -1,15 +1,5 @@
 import { z } from 'zod';
 
-// 프로젝트 설정 스키마
-export const ProjectSchema = z.object({
-  id: z.string(),
-  directory: z.string(),
-  slackChannels: z.array(z.string()).default([]),
-  isDefault: z.boolean().default(false),
-});
-
-export type Project = z.infer<typeof ProjectSchema>;
-
 // 전체 설정 스키마
 export const ConfigSchema = z.object({
   // Slack 설정 (login 시 저장)
@@ -30,15 +20,25 @@ export const ConfigSchema = z.object({
 
   // 세션 설정
   session: z.object({
-    maxMessages: z.number().default(20),
-    timeoutMinutes: z.number().default(30),
+    maxMessages: z.number().int().min(1).max(1000).default(20),
+    timeoutMinutes: z.number().int().min(1).max(1440).default(30),
   }).default({}),
 
   // 웹 대시보드 포트
-  webPort: z.number().default(3847),
+  webPort: z.number().int().min(1).max(65535).default(3847),
 
-  // 프로젝트 목록
-  projects: z.array(ProjectSchema).default([]),
+  // 성격 프리셋
+  personality: z.object({
+    preset: z.enum(['professional', 'friendly', 'detailed', 'custom']).default('professional'),
+    customPrompt: z.string().optional(),
+  }).default({}),
+
+  // MCP 서버 설정 (플러그인 설치 시 저장)
+  mcpServers: z.record(z.object({
+    command: z.string(),
+    args: z.array(z.string()).default([]),
+    env: z.record(z.string()).optional(),
+  })).default({}),
 });
 
 export type ClackbotConfig = z.infer<typeof ConfigSchema>;

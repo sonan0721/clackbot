@@ -3,6 +3,7 @@ import path from 'node:path';
 import { z } from 'zod';
 import { tool, createSdkMcpServer, type McpSdkServerConfigWithInstance } from '@anthropic-ai/claude-code';
 import { getToolsDir } from '../../config/paths.js';
+import { loadConfig } from '../../config/index.js';
 import { slackPostTool } from './builtin/slackPost.js';
 import { memoryReadTool, memoryWriteTool } from './builtin/memory.js';
 import { logger } from '../../utils/logger.js';
@@ -192,9 +193,19 @@ function pluginToolToMcpTool(pluginName: string, toolDef: PluginToolDefinition) 
   );
 }
 
-/** 모든 MCP 서버 설정 반환 (내장 + 플러그인) */
-export function getMcpServers(cwd?: string): Record<string, McpSdkServerConfigWithInstance> {
-  const servers: Record<string, McpSdkServerConfigWithInstance> = {};
+// stdio MCP 서버 설정 타입
+interface StdioMcpServerConfig {
+  type: 'stdio';
+  command: string;
+  args: string[];
+  env?: Record<string, string>;
+}
+
+export type McpServerConfig = McpSdkServerConfigWithInstance | StdioMcpServerConfig;
+
+/** 모든 MCP 서버 설정 반환 (내장 + config mcpServers + 플러그인 JSON) */
+export function getMcpServers(cwd?: string): Record<string, McpServerConfig> {
+  const servers: Record<string, McpServerConfig> = {};
 
   // 내장 도구 서버
   servers['clackbot'] = createSdkMcpServer({
@@ -203,7 +214,20 @@ export function getMcpServers(cwd?: string): Record<string, McpSdkServerConfigWi
     tools: [slackPostTool, memoryReadTool, memoryWriteTool],
   });
 
-  // 플러그인 도구 서버
+  // config.mcpServers에서 stdio MCP 서버 로드
+  const config = loadConfig(cwd);
+  if (config.mcpServers) {
+    for (const [name, serverConfig] of Object.entries(config.mcpServers)) {
+      servers[name] = {
+        type: 'stdio' as const,
+        command: serverConfig.command,
+        args: serverConfig.args,
+        ...(serverConfig.env ? { env: serverConfig.env } : {}),
+      };
+    }
+  }
+
+  // 플러그인 JSON 도구 서버 (하위 호환)
   const toolsDir = getToolsDir(cwd);
   const plugins = loadPluginTools(toolsDir);
 

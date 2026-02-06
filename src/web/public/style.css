@@ -244,6 +244,10 @@ select.form-control {
   appearance: auto;
 }
 
+textarea.form-control {
+  line-height: 1.6;
+}
+
 /* 버튼 */
 .btn {
   padding: 8px 16px;
@@ -281,32 +285,6 @@ select.form-control {
   border: 1px solid var(--border);
   border-radius: 6px;
   font-size: 14px;
-}
-
-/* 대화 아이템 */
-.conversation-item {
-  padding: 12px 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.conversation-item:last-child {
-  border-bottom: none;
-}
-
-.conversation-input {
-  font-weight: 500;
-  margin-bottom: 4px;
-}
-
-.conversation-output {
-  color: var(--text-muted);
-  font-size: 14px;
-}
-
-.conversation-meta {
-  font-size: 12px;
-  color: var(--text-muted);
-  margin-top: 4px;
 }
 
 /* 페이지 제목 */
@@ -355,6 +333,213 @@ select.form-control {
   border-color: var(--primary);
 }
 
+/* ─── 세션 카드 (대화 이력) ─── */
+
+.session-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.session-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.session-header:hover {
+  background: var(--bg);
+}
+
+.session-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.session-title {
+  font-weight: 500;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.session-toggle {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-left: 12px;
+  flex-shrink: 0;
+}
+
+.session-messages {
+  border-top: 1px solid var(--border);
+  padding: 16px 20px;
+  background: var(--bg);
+}
+
+/* 홈 페이지 세션 미니 카드 */
+.session-card-mini {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.session-card-mini:last-child {
+  border-bottom: none;
+}
+
+.session-preview {
+  font-weight: 500;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+/* ─── 채팅 말풍선 ─── */
+
+.chat-pair {
+  margin-bottom: 16px;
+}
+
+.chat-pair:last-child {
+  margin-bottom: 0;
+}
+
+.chat-bubble {
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  max-width: 85%;
+}
+
+.chat-user {
+  background: #e8f5e9;
+  border: 1px solid #c8e6c9;
+  margin-right: auto;
+}
+
+.chat-bot {
+  background: white;
+  border: 1px solid var(--border);
+  margin-left: auto;
+}
+
+.chat-role {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.chat-text {
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.chat-time {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+.chat-tools {
+  font-size: 11px;
+  color: var(--accent);
+  margin-top: 6px;
+}
+
+/* ─── 플러그인 설치 콘솔 ─── */
+
+.console-container {
+  margin-top: 12px;
+  border: 1px solid #2d2d2d;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.console-output {
+  background: #1e1e1e;
+  color: #d4d4d4;
+  font-family: 'SF Mono', 'Monaco', 'Menlo', 'Consolas', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  padding: 16px;
+  min-height: 200px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.console-line {
+  padding: 2px 0;
+  word-break: break-word;
+}
+
+.console-text {
+  color: #d4d4d4;
+}
+
+.console-system {
+  color: #808080;
+}
+
+.console-tool {
+  color: #569cd6;
+}
+
+.console-error {
+  color: #f44747;
+}
+
+.console-input-bar {
+  display: flex;
+  align-items: center;
+  background: #252526;
+  border-top: 1px solid #3c3c3c;
+  padding: 8px 12px;
+}
+
+.console-prompt {
+  color: var(--success);
+  font-family: 'SF Mono', 'Monaco', 'Menlo', 'Consolas', monospace;
+  font-size: 14px;
+  font-weight: 700;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.console-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #d4d4d4;
+  font-family: 'SF Mono', 'Monaco', 'Menlo', 'Consolas', monospace;
+  font-size: 13px;
+  outline: none;
+  padding: 4px 0;
+}
+
+.console-input::placeholder {
+  color: #5a5a5a;
+}
+
+#console-send {
+  margin-left: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
 /* 반응형 */
 @media (max-width: 768px) {
   .sidebar {
@@ -368,5 +553,8 @@ select.form-control {
   .content {
     margin-left: 60px;
     padding: 16px;
+  }
+  .chat-bubble {
+    max-width: 100%;
   }
 }

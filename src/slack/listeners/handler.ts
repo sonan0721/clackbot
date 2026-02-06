@@ -1,6 +1,5 @@
 import { queryAgent } from '../../agent/claude.js';
 import { sessionManager } from '../../session/manager.js';
-import { resolveProject } from '../../projects/resolver.js';
 import { saveConversation } from '../../store/conversations.js';
 import { truncateText } from '../../utils/slackFormat.js';
 import { logger } from '../../utils/logger.js';
@@ -20,9 +19,7 @@ export async function handleMessage(params: HandleMessageParams): Promise<void> 
   const { inputText, userId, channelId, threadTs, threadMessages, say } = params;
 
   try {
-    // 프로젝트 해석 (채널 → 프로젝트 매핑)
-    const project = resolveProject(channelId);
-    const cwd = project?.directory ?? process.cwd();
+    const cwd = process.cwd();
 
     // 세션 관리
     const session = sessionManager.getOrCreate(threadTs);
@@ -57,7 +54,6 @@ export async function handleMessage(params: HandleMessageParams): Promise<void> 
       inputText,
       outputText: response.text,
       toolsUsed: response.toolsUsed,
-      projectId: project?.id,
     });
 
     logger.debug('응답 전송 완료');

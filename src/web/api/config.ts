@@ -38,7 +38,12 @@ router.put('/', (req, res) => {
     }
 
     if (updates.webPort !== undefined) {
-      config.webPort = Number(updates.webPort);
+      const port = Number(updates.webPort);
+      if (!Number.isInteger(port) || port < 1 || port > 65535) {
+        res.status(400).json({ error: 'webPort는 1~65535 사이의 정수여야 합니다.' });
+        return;
+      }
+      config.webPort = port;
     }
 
     if (updates.ownerUserId !== undefined) {
@@ -46,7 +51,32 @@ router.put('/', (req, res) => {
     }
 
     if (updates.session !== undefined) {
-      config.session = { ...config.session, ...updates.session };
+      const s = updates.session;
+      if (s.maxMessages !== undefined) {
+        const v = Number(s.maxMessages);
+        if (!Number.isInteger(v) || v < 1 || v > 1000) {
+          res.status(400).json({ error: 'maxMessages는 1~1000 사이의 정수여야 합니다.' });
+          return;
+        }
+        s.maxMessages = v;
+      }
+      if (s.timeoutMinutes !== undefined) {
+        const v = Number(s.timeoutMinutes);
+        if (!Number.isInteger(v) || v < 1 || v > 1440) {
+          res.status(400).json({ error: 'timeoutMinutes는 1~1440 사이의 정수여야 합니다.' });
+          return;
+        }
+        s.timeoutMinutes = v;
+      }
+      config.session = { ...config.session, ...s };
+    }
+
+    if (updates.personality !== undefined) {
+      config.personality = { ...config.personality, ...updates.personality };
+    }
+
+    if (updates.mcpServers !== undefined) {
+      config.mcpServers = updates.mcpServers;
     }
 
     saveConfig(config);
