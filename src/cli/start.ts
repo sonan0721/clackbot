@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, type ExecFileSyncOptions } from 'node:child_process';
 import { config as loadEnv } from 'dotenv';
 import { loadConfig, saveConfig } from '../config/index.js';
 import { getLocalDir, getEnvPath } from '../config/paths.js';
@@ -13,6 +13,10 @@ import { sessionManager } from '../session/manager.js';
 import { logger } from '../utils/logger.js';
 
 // clackbot start — Slack 봇 + 웹 대시보드 동시 기동
+
+// Windows에서 npm, git 등 .cmd 파일을 찾으려면 shell: true 필요
+const isWindows = process.platform === 'win32';
+const shellOpt: Pick<ExecFileSyncOptions, 'shell'> = isWindows ? { shell: true } : {};
 
 interface StartOptions {
   web?: boolean;
@@ -40,16 +44,19 @@ async function checkForUpdates(branch: string): Promise<void> {
       cwd: installDir,
       timeout: 15000,
       stdio: 'pipe',
+      ...shellOpt,
     });
 
     // 로컬 HEAD vs 원격 HEAD 비교
     const local = execFileSync('git', ['rev-parse', 'HEAD'], {
       cwd: installDir,
       encoding: 'utf-8',
+      ...shellOpt,
     }).trim();
     const remote = execFileSync('git', ['rev-parse', `origin/${branch}`], {
       cwd: installDir,
       encoding: 'utf-8',
+      ...shellOpt,
     }).trim();
 
     if (local === remote) {
@@ -61,7 +68,7 @@ async function checkForUpdates(branch: string): Promise<void> {
     const count = execFileSync(
       'git',
       ['rev-list', '--count', `HEAD..origin/${branch}`],
-      { cwd: installDir, encoding: 'utf-8' },
+      { cwd: installDir, encoding: 'utf-8', ...shellOpt },
     ).trim();
     logger.info(`새 업데이트 발견 (${count}개 커밋). 업데이트 중...`);
 
@@ -69,13 +76,14 @@ async function checkForUpdates(branch: string): Promise<void> {
     const currentBranch = execFileSync(
       'git',
       ['rev-parse', '--abbrev-ref', 'HEAD'],
-      { cwd: installDir, encoding: 'utf-8' },
+      { cwd: installDir, encoding: 'utf-8', ...shellOpt },
     ).trim();
     if (currentBranch !== branch) {
       execFileSync('git', ['checkout', branch], {
         cwd: installDir,
         timeout: 10000,
         stdio: 'pipe',
+        ...shellOpt,
       });
     }
 
@@ -84,6 +92,7 @@ async function checkForUpdates(branch: string): Promise<void> {
       cwd: installDir,
       timeout: 10000,
       stdio: 'pipe',
+      ...shellOpt,
     });
 
     // 의존성 설치 + 빌드
@@ -92,6 +101,7 @@ async function checkForUpdates(branch: string): Promise<void> {
       cwd: installDir,
       timeout: 120000,
       stdio: 'pipe',
+      ...shellOpt,
     });
 
     logger.info('빌드 중...');
@@ -99,6 +109,7 @@ async function checkForUpdates(branch: string): Promise<void> {
       cwd: installDir,
       timeout: 60000,
       stdio: 'pipe',
+      ...shellOpt,
     });
 
     logger.success('업데이트 완료! 변경사항을 적용하려면 clackbot start를 다시 실행하세요.');
@@ -126,6 +137,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
     const version = execFileSync('claude', ['--version'], {
       encoding: 'utf-8',
       timeout: 5000,
+      ...shellOpt,
     }).trim();
     logger.success(`Claude Code 확인: ${version}`);
   } catch {
@@ -139,6 +151,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
     execFileSync('claude', ['-p', 'ping', '--max-turns', '1'], {
       encoding: 'utf-8',
       timeout: 30000,
+      ...shellOpt,
     });
   } catch {
     logger.error('Claude Code에 로그인되어 있지 않습니다.');
