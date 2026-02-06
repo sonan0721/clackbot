@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { input } from '@inquirer/prompts';
 import { getLocalDir, getToolsDir, getEnvPath } from '../config/paths.js';
 import { logger } from '../utils/logger.js';
 
@@ -86,14 +87,81 @@ export async function initCommand(): Promise<void> {
     logger.success('.env.example 생성');
   }
 
-  // slack-manifest.json 복사
+  // slack-manifest.json 동적 생성
   const manifestDest = path.join(clackbotDir, 'slack-manifest.json');
+  let manifestJson = '';
+
   if (!fs.existsSync(manifestDest)) {
-    const manifestSrc = path.join(templatesDir, 'slack-manifest.json');
-    if (fs.existsSync(manifestSrc)) {
-      fs.copyFileSync(manifestSrc, manifestDest);
-    }
+    // 앱 이름 입력 (한글/영어 가능)
+    const appName = await input({
+      message: 'Slack 앱 이름 (예: Clackbot, 비서봇):',
+      default: 'Clackbot',
+      validate: (val) => val.trim().length > 0 || '앱 이름을 입력하세요.',
+    });
+
+    // 봇 사용자 이름 입력 (영어만)
+    const botUsername = await input({
+      message: 'Bot 사용자 이름 (영어, 소문자, 하이픈 가능):',
+      default: 'clackbot',
+      validate: (val) =>
+        /^[a-z][a-z0-9._-]*$/.test(val) ||
+        '영어 소문자로 시작, 소문자/숫자/하이픈/밑줄/점만 사용 가능합니다.',
+    });
+
+    // manifest 동적 생성
+    const manifest = {
+      display_information: {
+        name: appName.trim(),
+        description: '개인 로컬 Slack 비서 — Claude Code 기반',
+        background_color: '#4A154B',
+      },
+      features: {
+        app_home: {
+          home_tab_enabled: false,
+          messages_tab_enabled: true,
+          messages_tab_read_only_enabled: false,
+        },
+        bot_user: {
+          display_name: appName.trim(),
+          always_online: false,
+        },
+      },
+      oauth_config: {
+        scopes: {
+          bot: [
+            'app_mentions:read',
+            'channels:history',
+            'channels:read',
+            'chat:write',
+            'groups:history',
+            'groups:read',
+            'im:history',
+            'im:read',
+            'im:write',
+            'reactions:write',
+            'users:read',
+          ],
+        },
+      },
+      settings: {
+        event_subscriptions: {
+          bot_events: ['app_mention', 'message.im'],
+        },
+        interactivity: {
+          is_enabled: false,
+        },
+        org_deploy_enabled: false,
+        socket_mode_enabled: true,
+        token_rotation_enabled: false,
+      },
+    };
+
+    manifestJson = JSON.stringify(manifest, null, 2);
+    fs.writeFileSync(manifestDest, manifestJson, 'utf-8');
     logger.success('.clackbot/slack-manifest.json 생성');
+  } else {
+    logger.warn('.clackbot/slack-manifest.json 이미 존재합니다.');
+    manifestJson = fs.readFileSync(manifestDest, 'utf-8');
   }
 
   logger.blank();
@@ -101,10 +169,13 @@ export async function initCommand(): Promise<void> {
   logger.blank();
   logger.info('다음 단계:');
   logger.blank();
-  logger.detail('1. Slack 앱 생성');
+  logger.detail('1. Slack 앱을 생성하세요:');
   logger.detail('   https://api.slack.com/apps → Create New App');
-  logger.detail('   "From an app manifest" → JSON 탭 → 아래 파일 내용 붙여넣기:');
-  logger.detail(`   ${manifestDest}`);
+  logger.detail('   "From an app manifest" 선택 → JSON 탭 → 아래 내용 붙여넣기:');
+  logger.blank();
+  console.log(manifestJson);
+  logger.blank();
+  logger.detail(`   또는 파일에서 복사: ${manifestDest}`);
   logger.blank();
   logger.detail('2. 워크스페이스에 앱 설치 → Bot Token 확인');
   logger.detail('   OAuth & Permissions → Install to Workspace');
