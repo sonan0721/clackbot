@@ -83,9 +83,26 @@ export async function loginCommand(): Promise<void> {
     }
 
     const botUserId = data.user_id!;
-    const botName = data.user ?? 'clackbot';
     const teamId = data.team_id ?? '';
     const teamName = data.team ?? '';
+
+    // users.info로 실제 표시 이름 조회
+    let botName = data.user ?? 'clackbot';
+    try {
+      const userRes = await fetch(`https://slack.com/api/users.info?user=${botUserId}`, {
+        headers: { 'Authorization': `Bearer ${botToken}` },
+      });
+      const userData = await userRes.json() as {
+        ok: boolean;
+        user?: { real_name?: string; profile?: { display_name?: string } };
+      };
+      if (userData.ok && userData.user) {
+        const displayName = userData.user.profile?.display_name || userData.user.real_name;
+        if (displayName) botName = displayName;
+      }
+    } catch {
+      // 실패 시 auth.test의 user 값 사용
+    }
 
     logger.success(`인증 성공!`);
     logger.detail(`봇 이름: @${botName}`);

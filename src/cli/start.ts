@@ -188,7 +188,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
       await startWebServer(port);
     }
 
-    // Slack auth.test로 실제 봇 이름 확인 및 config 동기화
+    // Slack API로 실제 봇 표시 이름 확인 및 config 동기화
     let botName = config.slack.botName || 'clackbot';
     try {
       const authRes = await fetch('https://slack.com/api/auth.test', {
@@ -198,9 +198,28 @@ export async function startCommand(options: StartOptions): Promise<void> {
           'Content-Type': 'application/json',
         },
       });
-      const authData = await authRes.json() as { ok: boolean; user?: string; team?: string };
-      if (authData.ok && authData.user) {
-        botName = authData.user;
+      const authData = await authRes.json() as { ok: boolean; user_id?: string; user?: string; team?: string };
+      if (authData.ok) {
+        // users.info로 실제 표시 이름 조회
+        let resolvedName = authData.user ?? botName;
+        if (authData.user_id) {
+          try {
+            const userRes = await fetch(`https://slack.com/api/users.info?user=${authData.user_id}`, {
+              headers: { 'Authorization': `Bearer ${botToken}` },
+            });
+            const userData = await userRes.json() as {
+              ok: boolean;
+              user?: { real_name?: string; profile?: { display_name?: string } };
+            };
+            if (userData.ok && userData.user) {
+              const displayName = userData.user.profile?.display_name || userData.user.real_name;
+              if (displayName) resolvedName = displayName;
+            }
+          } catch {
+            // users.info 실패 시 auth.test 값 사용
+          }
+        }
+        botName = resolvedName;
         if (botName !== config.slack.botName || (authData.team && authData.team !== config.slack.teamName)) {
           config.slack.botName = botName;
           if (authData.team) config.slack.teamName = authData.team;
