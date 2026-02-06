@@ -15,10 +15,10 @@ export async function loginCommand(): Promise<void> {
   }
 
   logger.info('Slack 토큰을 설정합니다.');
-  logger.detail('Slack 앱 설정 페이지: https://api.slack.com/apps');
   logger.blank();
 
   // Bot Token 입력
+  logger.detail('Bot Token: OAuth & Permissions → Bot User OAuth Token');
   const botToken = await password({
     message: 'Slack Bot Token (xoxb-...):',
     validate: (val) => {
@@ -28,6 +28,9 @@ export async function loginCommand(): Promise<void> {
   });
 
   // App Token 입력
+  logger.blank();
+  logger.detail('App Token: Basic Information → App-Level Tokens');
+  logger.detail('없으면 Generate Token → connections:write 스코프 추가');
   const appToken = await password({
     message: 'Slack App Token (xapp-...):',
     validate: (val) => {
@@ -37,6 +40,8 @@ export async function loginCommand(): Promise<void> {
   });
 
   // Anthropic API Key 입력 (선택)
+  logger.blank();
+  logger.detail('API Key: https://console.anthropic.com/');
   const anthropicKey = await password({
     message: 'Anthropic API Key (선택, Enter로 건너뛰기):',
   });
