@@ -30,6 +30,7 @@ program
   .description('Slack 봇과 웹 대시보드를 시작합니다')
   .option('--no-web', '웹 대시보드 없이 봇만 시작')
   .option('--port <number>', '웹 대시보드 포트 지정', '3847')
+  .option('--branch <name>', '업데이트 받을 Git 브랜치', 'main')
   .action(startCommand);
 
 // doctor — 진단
@@ -47,35 +48,6 @@ program
   .action(async (key: string, value: string) => {
     const { configSetCommand } = await import('./configSet.js');
     await configSetCommand(key, value);
-  });
-
-// project 명령어 그룹
-const projectCmd = program
-  .command('project')
-  .description('프로젝트 관리');
-
-projectCmd
-  .command('add <id> <directory>')
-  .description('프로젝트 등록')
-  .action(async (id: string, directory: string) => {
-    const { projectAddCommand } = await import('./projectCli.js');
-    await projectAddCommand(id, directory);
-  });
-
-projectCmd
-  .command('list')
-  .description('등록된 프로젝트 목록')
-  .action(async () => {
-    const { projectListCommand } = await import('./projectCli.js');
-    await projectListCommand();
-  });
-
-projectCmd
-  .command('map <id> <channelId>')
-  .description('프로젝트에 Slack 채널 매핑')
-  .action(async (id: string, channelId: string) => {
-    const { projectMapCommand } = await import('./projectCli.js');
-    await projectMapCommand(id, channelId);
   });
 
 // tool 명령어 그룹

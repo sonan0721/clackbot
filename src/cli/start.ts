@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { config as loadEnv } from 'dotenv';
 import { loadConfig } from '../config/index.js';
@@ -15,6 +16,96 @@ import { logger } from '../utils/logger.js';
 interface StartOptions {
   web?: boolean;
   port?: string;
+  branch?: string;
+}
+
+// 자동 업데이트 확인 — git clone 설치 환경에서만 동작
+async function checkForUpdates(branch: string): Promise<void> {
+  // 실행 중인 바이너리 경로에서 설치 디렉토리 추론
+  const binPath = fs.realpathSync(process.argv[1]);
+  const installDir = path.resolve(path.dirname(binPath), '../..');
+  const gitDir = path.join(installDir, '.git');
+
+  if (!fs.existsSync(gitDir)) {
+    logger.debug('Git 저장소가 아닌 환경입니다. 업데이트 확인을 건너뜁니다.');
+    return;
+  }
+
+  try {
+    logger.info('업데이트 확인 중...');
+
+    // 원격 fetch
+    execFileSync('git', ['fetch', 'origin', branch], {
+      cwd: installDir,
+      timeout: 15000,
+      stdio: 'pipe',
+    });
+
+    // 로컬 HEAD vs 원격 HEAD 비교
+    const local = execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: installDir,
+      encoding: 'utf-8',
+    }).trim();
+    const remote = execFileSync('git', ['rev-parse', `origin/${branch}`], {
+      cwd: installDir,
+      encoding: 'utf-8',
+    }).trim();
+
+    if (local === remote) {
+      logger.success('최신 버전입니다.');
+      return;
+    }
+
+    // 새 커밋 수 표시
+    const count = execFileSync(
+      'git',
+      ['rev-list', '--count', `HEAD..origin/${branch}`],
+      { cwd: installDir, encoding: 'utf-8' },
+    ).trim();
+    logger.info(`새 업데이트 발견 (${count}개 커밋). 업데이트 중...`);
+
+    // 브랜치 전환 (필요시)
+    const currentBranch = execFileSync(
+      'git',
+      ['rev-parse', '--abbrev-ref', 'HEAD'],
+      { cwd: installDir, encoding: 'utf-8' },
+    ).trim();
+    if (currentBranch !== branch) {
+      execFileSync('git', ['checkout', branch], {
+        cwd: installDir,
+        timeout: 10000,
+        stdio: 'pipe',
+      });
+    }
+
+    // 원격 브랜치로 리셋
+    execFileSync('git', ['reset', '--hard', `origin/${branch}`], {
+      cwd: installDir,
+      timeout: 10000,
+      stdio: 'pipe',
+    });
+
+    // 의존성 설치 + 빌드
+    logger.info('의존성 설치 중...');
+    execFileSync('npm', ['install', '--no-fund', '--no-audit'], {
+      cwd: installDir,
+      timeout: 120000,
+      stdio: 'pipe',
+    });
+
+    logger.info('빌드 중...');
+    execFileSync('npm', ['run', 'build'], {
+      cwd: installDir,
+      timeout: 60000,
+      stdio: 'pipe',
+    });
+
+    logger.success('업데이트 완료! 변경사항을 적용하려면 clackbot start를 다시 실행하세요.');
+    process.exit(0);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.warn(`업데이트 확인 실패 (${msg}). 기존 버전으로 계속합니다.`);
+  }
 }
 
 export async function startCommand(options: StartOptions): Promise<void> {
@@ -25,6 +116,9 @@ export async function startCommand(options: StartOptions): Promise<void> {
     logger.error('.clackbot/ 디렉토리가 없습니다. 먼저 clackbot init을 실행하세요.');
     process.exit(1);
   }
+
+  // 자동 업데이트 확인
+  await checkForUpdates(options.branch || 'main');
 
   // Claude Code 설치 확인
   try {
