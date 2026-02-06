@@ -130,7 +130,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
     logger.success(`Claude Code 확인: ${version}`);
   } catch {
     logger.error('Claude Code가 설치되어 있지 않습니다.');
-    logger.detail('설치: npm install -g @anthropic-ai/claude-code');
+    logger.detail('설치 가이드: https://code.claude.com/docs/ko/setup');
     process.exit(1);
   }
 
