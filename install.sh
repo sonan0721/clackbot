@@ -102,10 +102,20 @@ build() {
   chmod +x "$INSTALL_DIR/dist/bin/clackbot.js"
 }
 
-# ─── 심볼릭 링크 ─────────────────────────────────────────────────────────────
+# ─── 심볼릭 링크 / CMD 래퍼 ──────────────────────────────────────────────────
 create_symlink() {
   TARGET="$INSTALL_DIR/dist/bin/clackbot.js"
+  OS=$(uname -s 2>/dev/null || echo "Unknown")
 
+  # Windows (Git Bash / MSYS / Cygwin) — .cmd 래퍼 생성
+  case "$OS" in
+    MINGW*|MSYS*|CYGWIN*)
+      create_windows_cmd
+      return
+      ;;
+  esac
+
+  # macOS / Linux — 심볼릭 링크
   # 1차 시도: /usr/local/bin
   if [ -d "/usr/local/bin" ] && [ -w "/usr/local/bin" ]; then
     ln -sf "$TARGET" "/usr/local/bin/$BIN_NAME"
@@ -140,6 +150,34 @@ create_symlink() {
       echo ""
       ;;
   esac
+}
+
+# ─── Windows .cmd 래퍼 생성 ──────────────────────────────────────────────────
+create_windows_cmd() {
+  TARGET="$INSTALL_DIR/dist/bin/clackbot.js"
+
+  # Windows 경로로 변환
+  WIN_TARGET=$(cygpath -w "$TARGET" 2>/dev/null || echo "$TARGET")
+
+  # npm global prefix 디렉토리에 .cmd 래퍼 생성
+  NPM_PREFIX=$(npm prefix -g 2>/dev/null)
+
+  if [ -n "$NPM_PREFIX" ]; then
+    CMD_PATH="$NPM_PREFIX/$BIN_NAME.cmd"
+    SH_PATH="$NPM_PREFIX/$BIN_NAME"
+
+    # .cmd (Command Prompt / PowerShell용)
+    printf '@echo off\r\nnode "%s" %%*\r\n' "$WIN_TARGET" > "$CMD_PATH"
+    ok "CMD 래퍼 생성: $CMD_PATH"
+
+    # sh (Git Bash용)
+    printf '#!/bin/sh\nnode "%s" "$@"\n' "$TARGET" > "$SH_PATH"
+    chmod +x "$SH_PATH" 2>/dev/null
+    ok "Git Bash 래퍼 생성: $SH_PATH"
+  else
+    warn "npm global prefix를 찾을 수 없습니다."
+    warn "수동으로 PATH에 추가하세요: node \"$WIN_TARGET\""
+  fi
 }
 
 # ─── 검증 ────────────────────────────────────────────────────────────────────
