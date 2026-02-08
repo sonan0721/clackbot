@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { loadPluginTools } from '../../agent/tools/loader.js';
 import { getToolsDir } from '../../config/paths.js';
 import { loadConfig } from '../../config/index.js';
+import { loadPlugins } from '../../plugins/registry.js';
 
 // GET /api/tools — 연동 툴 목록
 
@@ -67,11 +68,27 @@ router.get('/', (_req, res) => {
     })
   );
 
+  // 통합 플러그인 MCP 서버 (.clackbot/plugins/)
+  const integratedPlugins = loadPlugins();
+  const pluginMcpServers = integratedPlugins
+    .filter(p => p.hasMcp)
+    .map(p => ({
+      name: `plugin-${p.name}`,
+      displayName: p.displayName,
+      command: p.manifest.mcp!.command,
+      args: p.manifest.mcp!.args,
+      env: p.manifest.mcp!.env ? Object.keys(p.manifest.mcp!.env) : [],
+      type: 'plugin-mcp' as const,
+      status: 'active' as const,
+      hasPage: p.hasDashboard,
+    }));
+
   res.json({
     builtin: builtinTools,
     mcpServers,
+    pluginMcpServers,
     plugins: pluginTools,
-    total: builtinTools.length + mcpServers.length + pluginTools.length,
+    total: builtinTools.length + mcpServers.length + pluginMcpServers.length + pluginTools.length,
   });
 });
 

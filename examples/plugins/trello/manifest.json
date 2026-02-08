@@ -1,0 +1,18 @@
+{
+  "name": "trello",
+  "displayName": "Trello",
+  "description": "Trello 보드 및 카드 관리",
+  "version": "1.0.0",
+  "mcp": {
+    "command": "npx",
+    "args": ["-y", "@trello/mcp-server"],
+    "env": {
+      "TRELLO_API_KEY": "Trello API 키",
+      "TRELLO_TOKEN": "Trello 토큰"
+    }
+  },
+  "dashboard": {
+    "page": "page.js",
+    "navLabel": "Trello"
+  }
+}

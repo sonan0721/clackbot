@@ -9,6 +9,7 @@ import conversationsRouter from './api/conversations.js';
 import configRouter from './api/config.js';
 import consoleRouter from './api/console.js';
 import supervisorRouter from './api/supervisor.js';
+import pluginsRouter from './api/plugins.js';
 import slackRouter from './api/slack.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -48,6 +49,7 @@ export function createWebServer() {
   app.use('/api/config', configRouter);
   app.use('/api/console', consoleRouter);
   app.use('/api/supervisor', supervisorRouter);
+  app.use('/api/plugins', pluginsRouter);
   app.use('/api/slack', slackRouter);
 
   // 정적 파일 서빙 (대시보드 프론트엔드) — 캐시 비활성화

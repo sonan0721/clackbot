@@ -6,6 +6,11 @@ const API_BASE = '';
 let consoleEventSource = null;
 let supervisorEventSource = null;
 
+// 플러그인 레지스트리
+let pluginRegistry = [];
+let pluginScriptsLoaded = {};
+let currentPluginDestroy = null;
+
 // API 호출 헬퍼
 async function api(path, options = {}) {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -27,7 +32,12 @@ const routes = {
 // 라우팅
 function navigate() {
   const hash = location.hash.slice(1) || '/';
-  const render = routes[hash] || renderHome;
+
+  // 이전 플러그인 페이지 정리
+  if (currentPluginDestroy) {
+    try { currentPluginDestroy(); } catch { /* 무시 */ }
+    currentPluginDestroy = null;
+  }
 
   // 페이지 이탈 시 SSE 연결 정리
   if (hash !== '/supervisor' && supervisorEventSource) {
@@ -39,15 +49,24 @@ function navigate() {
     consoleEventSource = null;
   }
 
+  // 플러그인 라우트 매칭: /plugin/{name}
+  const pluginMatch = hash.match(/^\/plugin\/([a-z0-9-]+)$/);
+  const render = pluginMatch ? null : (routes[hash] || renderHome);
+
+  // 네비게이션 활성화 처리
   document.querySelectorAll('.nav-link').forEach(link => {
     const page = link.getAttribute('data-page');
-    const isActive =
-      (hash === '/' && page === 'home') ||
-      hash === '/' + page;
+    const isActive = pluginMatch
+      ? page === `plugin/${pluginMatch[1]}`
+      : ((hash === '/' && page === 'home') || hash === '/' + page);
     link.classList.toggle('active', isActive);
   });
 
-  render();
+  if (pluginMatch) {
+    renderPluginPage(pluginMatch[1]);
+  } else {
+    render();
+  }
 }
 
 // 봇 상태 로드
@@ -901,10 +920,106 @@ function debounce(fn, delay) {
   };
 }
 
+// ─── 플러그인 동적 로딩 ───
+
+/** 플러그인 레지스트리 로드 */
+async function loadPluginRegistry() {
+  try {
+    const data = await api('/api/plugins');
+    pluginRegistry = data.plugins || [];
+  } catch {
+    pluginRegistry = [];
+  }
+}
+
+/** 플러그인 네비게이션 렌더링 */
+function renderPluginNav() {
+  const navEl = document.getElementById('plugin-nav');
+  const divider = document.getElementById('plugin-nav-divider');
+  if (!navEl) return;
+
+  const dashboardPlugins = pluginRegistry.filter(p => p.hasDashboard);
+
+  if (dashboardPlugins.length === 0) {
+    navEl.innerHTML = '';
+    if (divider) divider.style.display = 'none';
+    return;
+  }
+
+  if (divider) divider.style.display = '';
+
+  navEl.innerHTML = dashboardPlugins.map(p => `
+    <a href="#/plugin/${p.name}" class="nav-link" data-page="plugin/${p.name}">
+      ${escapeHtml(p.navLabel || p.displayName)}
+    </a>
+  `).join('');
+}
+
+/** 플러그인 스크립트 로드 (동적 <script> 태그) */
+function loadPluginScript(url) {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = url;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error(`스크립트 로드 실패: ${url}`));
+    document.head.appendChild(script);
+  });
+}
+
+/** 플러그인 페이지 렌더링 */
+async function renderPluginPage(name) {
+  const content = document.getElementById('page-content');
+  const plugin = pluginRegistry.find(p => p.name === name);
+
+  if (!plugin || !plugin.hasDashboard) {
+    content.innerHTML = '<h1 class="page-title">플러그인을 찾을 수 없습니다</h1>';
+    return;
+  }
+
+  content.innerHTML = '<h1 class="page-title">로딩 중...</h1>';
+
+  // 스크립트가 아직 로드되지 않았으면 로드
+  if (!pluginScriptsLoaded[name]) {
+    try {
+      await loadPluginScript(plugin.pageUrl);
+      pluginScriptsLoaded[name] = true;
+    } catch (err) {
+      content.innerHTML = `<h1 class="page-title">플러그인 로드 실패</h1>
+        <div class="card"><p>${escapeHtml(err.message)}</p></div>`;
+      return;
+    }
+  }
+
+  // 플러그인 render 함수 호출
+  const pluginModule = window.__clackbot_plugins && window.__clackbot_plugins[name];
+  if (!pluginModule || typeof pluginModule.render !== 'function') {
+    content.innerHTML = `<h1 class="page-title">플러그인 오류</h1>
+      <div class="card"><p>플러그인 '${escapeHtml(name)}'의 render 함수를 찾을 수 없습니다.</p></div>`;
+    return;
+  }
+
+  // destroy 함수 등록
+  if (typeof pluginModule.destroy === 'function') {
+    currentPluginDestroy = pluginModule.destroy;
+  }
+
+  // helpers 제공
+  const helpers = { fetch: window.fetch.bind(window), escapeHtml, debounce, api };
+
+  try {
+    await pluginModule.render(content, helpers);
+  } catch (err) {
+    content.innerHTML = `<h1 class="page-title">플러그인 렌더링 실패</h1>
+      <div class="card"><p>${escapeHtml(err.message)}</p></div>`;
+  }
+}
+
 // ─── 초기화 ───
 
 window.addEventListener('hashchange', navigate);
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
   loadStatus();
+  await loadPluginRegistry();
+  renderPluginNav();
   navigate();
 });

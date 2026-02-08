@@ -98,6 +98,37 @@ body {
   font-weight: 600;
 }
 
+.nav-divider {
+  border-top: 1px solid rgba(255,255,255,0.1);
+  margin: 8px 20px;
+  list-style: none;
+}
+
+#plugin-nav {
+  padding: 0;
+}
+
+#plugin-nav .nav-link {
+  display: block;
+  padding: 10px 20px;
+  color: rgba(255,255,255,0.7);
+  text-decoration: none;
+  transition: all 0.15s;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+#plugin-nav .nav-link:hover {
+  background: rgba(255,255,255,0.1);
+  color: white;
+}
+
+#plugin-nav .nav-link.active {
+  background: rgba(255,255,255,0.15);
+  color: white;
+  font-weight: 600;
+}
+
 /* 메인 콘텐츠 */
 .content {
   margin-left: var(--sidebar-width);

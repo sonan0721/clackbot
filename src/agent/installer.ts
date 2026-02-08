@@ -1,6 +1,9 @@
 import { query, type SDKMessage } from '@anthropic-ai/claude-code';
+import fs from 'node:fs';
+import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { loadConfig, saveConfig } from '../config/index.js';
+import { getPluginsDir } from '../config/paths.js';
 import { logger } from '../utils/logger.js';
 
 // 플러그인 설치 전용 에이전트
@@ -33,10 +36,16 @@ ${Object.keys(config.mcpServers).length > 0
   ? Object.entries(config.mcpServers).map(([name, s]) => `- ${name}: ${s.command} ${s.args.join(' ')}`).join('\n')
   : '(없음)'}
 
+플러그인 시스템:
+- 통합 플러그인은 .clackbot/plugins/{name}/ 디렉토리에 manifest.json + page.js로 구성됩니다.
+- manifest.json 예시: {"name":"hello","displayName":"Hello","mcp":{...},"dashboard":{"page":"page.js","navLabel":"Hello"}}
+- page.js는 IIFE로 감싸서 window.__clackbot_plugins[name]에 render(container, helpers) 함수를 등록합니다.
+
 중요:
 - 한국어로 답변하세요
-- 설치 결과를 JSON 형태로 보고하세요: {"action":"install","name":"서버이름","command":"npx","args":["-y","패키지명"],"env":{"KEY":"설명"}}
-- 삭제 요청 시: {"action":"remove","name":"서버이름"}
+- MCP 서버 설치: {"action":"install","name":"서버이름","command":"npx","args":["-y","패키지명"],"env":{"KEY":"설명"}}
+- MCP 서버 삭제: {"action":"remove","name":"서버이름"}
+- 통합 플러그인 설치: {"action":"install-plugin","name":"플러그인이름","manifest":{...},"pageJs":"코드"}
 - 검색만 할 때는 일반 텍스트로 답변하세요`;
 
     try {
@@ -107,7 +116,7 @@ ${Object.keys(config.mcpServers).length > 0
   /** 에이전트 응답에서 JSON 액션을 찾아 config에 반영 */
   private tryParseAction(text: string): void {
     // JSON 블록 추출 (```json ... ``` 또는 { ... })
-    const jsonMatches = text.match(/\{[^{}]*"action"\s*:\s*"(?:install|remove)"[^{}]*\}/g);
+    const jsonMatches = text.match(/\{[^{}]*"action"\s*:\s*"(?:install|remove|install-plugin)"[^{}]*\}/g);
     if (!jsonMatches) return;
 
     for (const match of jsonMatches) {
@@ -129,6 +138,16 @@ ${Object.keys(config.mcpServers).length > 0
           delete config.mcpServers[action.name];
           saveConfig(config);
           logger.info(`MCP 서버 제거됨: ${action.name}`);
+        }
+
+        if (action.action === 'install-plugin' && action.name && action.manifest) {
+          const pluginDir = path.join(getPluginsDir(), action.name);
+          fs.mkdirSync(pluginDir, { recursive: true });
+          fs.writeFileSync(path.join(pluginDir, 'manifest.json'), JSON.stringify(action.manifest, null, 2));
+          if (action.pageJs) {
+            fs.writeFileSync(path.join(pluginDir, 'page.js'), action.pageJs);
+          }
+          logger.info(`플러그인 설치됨: ${action.name}`);
         }
       } catch {
         // JSON 파싱 실패 시 무시

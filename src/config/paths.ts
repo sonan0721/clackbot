@@ -29,9 +29,14 @@ export function getDbPath(cwd?: string): string {
   return path.join(getLocalDir(cwd), 'conversations.db');
 }
 
-/** 플러그인 툴 디렉토리 */
+/** 플러그인 툴 디렉토리 (레거시 JSON) */
 export function getToolsDir(cwd?: string): string {
   return path.join(getLocalDir(cwd), 'tools');
+}
+
+/** 플러그인 디렉토리 (통합 플러그인) */
+export function getPluginsDir(cwd?: string): string {
+  return path.join(getLocalDir(cwd), 'plugins');
 }
 
 /** .env 파일 경로 */
