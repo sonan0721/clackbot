@@ -2,6 +2,10 @@
 
 const API_BASE = '';
 
+// SSE 연결 (페이지 간 정리용)
+let consoleEventSource = null;
+let supervisorEventSource = null;
+
 // API 호출 헬퍼
 async function api(path, options = {}) {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -16,6 +20,7 @@ const routes = {
   '/': renderHome,
   '/conversations': renderConversations,
   '/tools': renderTools,
+  '/supervisor': renderSupervisor,
   '/settings': renderSettings,
 };
 
@@ -23,6 +28,16 @@ const routes = {
 function navigate() {
   const hash = location.hash.slice(1) || '/';
   const render = routes[hash] || renderHome;
+
+  // 페이지 이탈 시 SSE 연결 정리
+  if (hash !== '/supervisor' && supervisorEventSource) {
+    supervisorEventSource.close();
+    supervisorEventSource = null;
+  }
+  if (hash !== '/tools' && consoleEventSource) {
+    consoleEventSource.close();
+    consoleEventSource = null;
+  }
 
   document.querySelectorAll('.nav-link').forEach(link => {
     const page = link.getAttribute('data-page');
@@ -93,6 +108,10 @@ async function renderHome() {
       <div class="stat-card">
         <div class="label">접근 모드</div>
         <div class="value">${s.accessMode === 'public' ? '공개' : '소유자 전용'}</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">응답 모드</div>
+        <div class="value">${s.replyMode === 'chat' ? '채널 응답' : '스레드 응답'}</div>
       </div>
       <div class="stat-card">
         <div class="label">등록된 도구</div>
@@ -383,7 +402,6 @@ async function renderTools() {
 }
 
 // SSE 콘솔 연결
-let consoleEventSource = null;
 
 function setupConsoleSSE() {
   // 기존 연결 정리
@@ -439,6 +457,228 @@ function appendConsole(type, text) {
   output.scrollTop = output.scrollHeight;
 }
 
+// ─── 슈퍼바이저 페이지 ───
+
+async function renderSupervisor() {
+  const content = document.getElementById('page-content');
+  content.innerHTML = '<h1 class="page-title">슈퍼바이저</h1><div class="card">로딩 중...</div>';
+
+  // 규칙 파일 목록 로드
+  let filesData;
+  try {
+    filesData = await api('/api/supervisor/files');
+  } catch {
+    filesData = { files: [] };
+  }
+
+  const files = filesData.files || [];
+  const firstSlug = files.length > 0 ? files[0].slug : '';
+
+  content.innerHTML = `
+    <h1 class="page-title">슈퍼바이저</h1>
+
+    <div class="card">
+      <h2>규칙 파일 편집기</h2>
+      <div style="margin-top: 16px;">
+        <div class="file-tabs" id="file-tabs">
+          ${files.map((f, i) => `
+            <button class="file-tab ${i === 0 ? 'active' : ''}" data-slug="${f.slug}" onclick="window.__selectFileTab('${f.slug}')">
+              ${escapeHtml(f.path)}
+            </button>
+          `).join('')}
+        </div>
+        <div class="file-editor-container">
+          <textarea id="file-editor" class="file-editor" placeholder="로딩 중..."></textarea>
+          <div class="file-status" id="file-status"></div>
+          <div class="file-actions">
+            <button class="btn btn-primary" onclick="window.__saveFile()">저장</button>
+            <button class="btn" onclick="window.__refreshFile()">새로고침</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>슈퍼바이저 콘솔</h2>
+        <button class="btn" onclick="window.__resetSupervisor()" style="font-size: 12px; padding: 4px 8px;">세션 초기화</button>
+      </div>
+      <div class="console-container">
+        <div id="sv-console-output" class="console-output">
+          <div class="console-line console-system">슈퍼바이저 콘솔입니다. 규칙 편집, 설정 관리, Slack 명령을 실행할 수 있습니다.</div>
+          <div class="console-line console-system">예: "rules.md에 금지 규칙 추가해줘", "CLAUDE.md 내용 요약해줘"</div>
+        </div>
+        <div class="console-input-bar">
+          <span class="console-prompt">$</span>
+          <input type="text" id="sv-console-input" class="console-input" placeholder="메시지 입력..." />
+          <button class="btn btn-primary" id="sv-console-send" onclick="window.__sendSupervisor()" style="margin-left: 8px; padding: 6px 12px; font-size: 12px;">전송</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // 현재 선택된 파일 slug
+  let currentSlug = firstSlug;
+
+  // 파일 탭 선택
+  window.__selectFileTab = async (slug) => {
+    currentSlug = slug;
+    document.querySelectorAll('.file-tab').forEach(tab => {
+      tab.classList.toggle('active', tab.dataset.slug === slug);
+    });
+    await loadFileContent(slug);
+  };
+
+  // 파일 내용 로드
+  async function loadFileContent(slug) {
+    const editor = document.getElementById('file-editor');
+    const status = document.getElementById('file-status');
+    if (!editor || !status) return;
+
+    editor.value = '';
+    status.textContent = '로딩 중...';
+
+    try {
+      const data = await api(`/api/supervisor/files/${slug}`);
+      editor.value = data.content || '';
+      status.textContent = data.exists
+        ? '파일이 존재합니다.'
+        : '파일이 존재하지 않습니다. 저장하면 생성됩니다.';
+    } catch {
+      status.textContent = '파일 로드 실패';
+    }
+  }
+
+  // 파일 저장
+  window.__saveFile = async () => {
+    const editor = document.getElementById('file-editor');
+    const status = document.getElementById('file-status');
+    if (!editor || !status || !currentSlug) return;
+
+    try {
+      await api(`/api/supervisor/files/${currentSlug}`, {
+        method: 'PUT',
+        body: JSON.stringify({ content: editor.value }),
+      });
+      status.textContent = '저장되었습니다.';
+    } catch {
+      status.textContent = '저장 실패';
+    }
+  };
+
+  // 파일 새로고침
+  window.__refreshFile = () => {
+    if (currentSlug) loadFileContent(currentSlug);
+  };
+
+  // 초기 파일 로드
+  if (firstSlug) {
+    await loadFileContent(firstSlug);
+  }
+
+  // 슈퍼바이저 SSE 연결
+  setupSupervisorSSE();
+
+  // 콘솔 입력
+  const svInput = document.getElementById('sv-console-input');
+  svInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') window.__sendSupervisor();
+  });
+
+  window.__sendSupervisor = async () => {
+    const input = document.getElementById('sv-console-input');
+    const message = input.value.trim();
+    if (!message) return;
+    input.value = '';
+
+    try {
+      await api('/api/supervisor/send', {
+        method: 'POST',
+        body: JSON.stringify({ message }),
+      });
+    } catch (err) {
+      appendSupervisorConsole('error', `전송 실패: ${err.message}`);
+    }
+  };
+
+  window.__resetSupervisor = async () => {
+    try {
+      await api('/api/supervisor/reset', { method: 'POST' });
+      const output = document.getElementById('sv-console-output');
+      if (output) {
+        output.innerHTML = '<div class="console-line console-system">세션이 초기화되었습니다.</div>';
+      }
+    } catch {
+      // 무시
+    }
+  };
+}
+
+function setupSupervisorSSE() {
+  // 기존 연결 정리
+  if (supervisorEventSource) {
+    supervisorEventSource.close();
+    supervisorEventSource = null;
+  }
+
+  supervisorEventSource = new EventSource('/api/supervisor/events');
+
+  supervisorEventSource.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      if (data.type === 'connected') return;
+
+      if (data.type === 'text') {
+        appendSupervisorConsole('text', data.data);
+      } else if (data.type === 'tool_call') {
+        try {
+          const tool = JSON.parse(data.data);
+          appendSupervisorConsole('tool', `도구 호출: ${tool.name}`);
+        } catch {
+          appendSupervisorConsole('tool', data.data);
+        }
+      } else if (data.type === 'error') {
+        appendSupervisorConsole('error', data.data);
+      } else if (data.type === 'done') {
+        appendSupervisorConsole('system', '완료');
+      } else if (data.type === 'file_changed') {
+        appendSupervisorConsole('system', `파일 변경됨: ${data.data}`);
+        // 현재 편집 중인 파일이면 자동 새로고침
+        const activeTab = document.querySelector('.file-tab.active');
+        if (activeTab) {
+          const slug = activeTab.dataset.slug;
+          const fileMap = { 'CLAUDE.md': 'claude-md', 'rules.md': 'rules-md', '.clackbot/rules.md': 'clackbot-rules-md' };
+          if (fileMap[data.data] === slug) {
+            window.__refreshFile();
+          }
+        }
+      }
+    } catch {
+      // 파싱 실패 무시
+    }
+  };
+
+  supervisorEventSource.onerror = () => {
+    // 자동 재연결 (EventSource 기본 동작)
+  };
+}
+
+function appendSupervisorConsole(type, text) {
+  const output = document.getElementById('sv-console-output');
+  if (!output) return;
+
+  const lines = text.split('\n');
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    const div = document.createElement('div');
+    div.className = `console-line console-${type}`;
+    div.textContent = line;
+    output.appendChild(div);
+  }
+
+  output.scrollTop = output.scrollHeight;
+}
+
 // ─── 설정 페이지 (성격 preset 포함) ───
 
 async function renderSettings() {
@@ -480,6 +720,14 @@ async function renderSettings() {
           <option value="owner" ${config.accessMode === 'owner' ? 'selected' : ''}>소유자 전용 (owner)</option>
           <option value="public" ${config.accessMode === 'public' ? 'selected' : ''}>공개 (public)</option>
         </select>
+      </div>
+      <div class="form-group">
+        <label>응답 모드</label>
+        <select id="cfg-reply" class="form-control" style="max-width: 300px;">
+          <option value="thread" ${config.replyMode === 'thread' ? 'selected' : ''}>스레드 응답 (thread)</option>
+          <option value="chat" ${config.replyMode === 'chat' ? 'selected' : ''}>채널 응답 (chat)</option>
+        </select>
+        <div style="margin-top: 4px; font-size: 12px; color: var(--text-muted);">chat: 채널 최상위 멘션 시 채널에 직접 응답</div>
       </div>
       <div class="form-group">
         <label>소유자 Slack User ID</label>
@@ -604,6 +852,7 @@ async function renderSettings() {
 
     const updates = {
       accessMode: document.getElementById('cfg-access').value,
+      replyMode: document.getElementById('cfg-reply').value,
       ownerUserId: document.getElementById('cfg-owner').value || undefined,
       webPort: port,
       session: {

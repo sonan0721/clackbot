@@ -540,6 +540,86 @@ textarea.form-control {
   font-size: 12px;
 }
 
+/* ─── 파일 에디터 (슈퍼바이저) ─── */
+
+.file-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 0;
+}
+
+.file-tab {
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  background: transparent;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+
+.file-tab:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.file-tab.active {
+  background: var(--bg-card);
+  color: var(--text);
+  border-color: var(--border);
+  position: relative;
+}
+
+.file-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--bg-card);
+}
+
+.file-editor-container {
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  background: var(--bg-card);
+}
+
+.file-editor {
+  width: 100%;
+  min-height: 300px;
+  padding: 16px;
+  border: none;
+  font-family: 'SF Mono', 'Monaco', 'Menlo', 'Consolas', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  resize: vertical;
+  background: var(--bg-card);
+  color: var(--text);
+  outline: none;
+}
+
+.file-status {
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+}
+
+.file-actions {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}
+
 /* 반응형 */
 @media (max-width: 768px) {
   .sidebar {

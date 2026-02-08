@@ -51,8 +51,8 @@ export function registerAppMention(app: App): void {
       }
     }
 
-    // public 모드 + 채널 최상위 메시지면 채널에 직접 응답
-    const replyInChannel = config.accessMode === 'public' && !event.thread_ts;
+    // chat 모드 + 채널 최상위 메시지면 채널에 직접 응답
+    const replyInChannel = config.replyMode === 'chat' && !event.thread_ts;
 
     // 메시지 처리 (Claude Agent 호출)
     await handleMessage({

@@ -20,6 +20,12 @@ router.get('/', (_req, res) => {
       status: 'active' as const,
     },
     {
+      name: 'slack_read_channel',
+      description: 'Slack 채널의 최근 메시지를 읽어옵니다',
+      type: 'builtin' as const,
+      status: 'active' as const,
+    },
+    {
       name: 'memory_read',
       description: 'Clackbot 메모리를 읽습니다',
       type: 'builtin' as const,

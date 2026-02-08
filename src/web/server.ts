@@ -8,6 +8,7 @@ import toolsRouter from './api/tools.js';
 import conversationsRouter from './api/conversations.js';
 import configRouter from './api/config.js';
 import consoleRouter from './api/console.js';
+import supervisorRouter from './api/supervisor.js';
 import slackRouter from './api/slack.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -37,6 +38,7 @@ export function createWebServer() {
       botUserId: config.slack.botUserId || null,
       teamName: config.slack.teamName || null,
       accessMode: config.accessMode,
+      replyMode: config.replyMode,
       webPort: config.webPort,
     });
   });
@@ -45,6 +47,7 @@ export function createWebServer() {
   app.use('/api/conversations', conversationsRouter);
   app.use('/api/config', configRouter);
   app.use('/api/console', consoleRouter);
+  app.use('/api/supervisor', supervisorRouter);
   app.use('/api/slack', slackRouter);
 
   // 정적 파일 서빙 (대시보드 프론트엔드) — 캐시 비활성화
