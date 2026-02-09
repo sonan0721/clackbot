@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Router, type Request, type Response } from 'express';
+import { getLocalDir } from '../../config/paths.js';
 import { Supervisor, type SupervisorEvent } from '../../agent/supervisor.js';
 
 // SSE + 사용자 입력 + 파일 편집 API — 슈퍼바이저 콘솔
@@ -13,11 +14,10 @@ let supervisor: Supervisor | null = null;
 // SSE 클라이언트 목록
 const sseClients: Set<Response> = new Set();
 
-// 규칙 파일 slug → 상대 경로 매핑
+// 규칙 파일 slug → .clackbot/ 내 상대 경로 매핑
 const ALLOWED_FILES: Record<string, string> = {
   'claude-md': 'CLAUDE.md',
   'rules-md': 'rules.md',
-  'clackbot-rules-md': '.clackbot/rules.md',
 };
 
 function getSupervisor(): Supervisor {
@@ -94,13 +94,13 @@ router.post('/reset', (_req: Request, res: Response) => {
 function resolveFilePath(slug: string): string | null {
   const relativePath = ALLOWED_FILES[slug];
   if (!relativePath) return null;
-  return path.resolve(process.cwd(), relativePath);
+  return path.resolve(getLocalDir(), relativePath);
 }
 
 // GET /api/supervisor/files — 규칙 파일 목록 및 존재 여부
 router.get('/files', (_req: Request, res: Response) => {
   const files = Object.entries(ALLOWED_FILES).map(([slug, relativePath]) => {
-    const fullPath = path.resolve(process.cwd(), relativePath);
+    const fullPath = path.resolve(getLocalDir(), relativePath);
     return {
       slug,
       path: relativePath,

@@ -4,6 +4,7 @@ import { execFileSync, type ExecFileSyncOptions } from 'node:child_process';
 import { config as loadEnv } from 'dotenv';
 import { loadConfig, saveConfig } from '../config/index.js';
 import { getLocalDir, getEnvPath, APP_VERSION } from '../config/paths.js';
+import { fileURLToPath } from 'node:url';
 import { createSlackApp, startSlackApp } from '../slack/app.js';
 import { startWebServer } from '../web/server.js';
 import { initDatabase, closeDatabase } from '../store/conversations.js';
@@ -23,6 +24,28 @@ interface StartOptions {
   web?: boolean;
   port?: string;
   branch?: string;
+}
+
+// 기본 파일 확인 및 생성
+function ensureDefaultFiles(localDir: string): void {
+  // CLAUDE.md
+  const claudeMd = path.join(localDir, 'CLAUDE.md');
+  if (!fs.existsSync(claudeMd)) {
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    const templatePath = path.resolve(__dirname, '../../templates/CLAUDE.md');
+    if (fs.existsSync(templatePath)) {
+      fs.copyFileSync(templatePath, claudeMd);
+    } else {
+      fs.writeFileSync(claudeMd, '# Clackbot 규칙\n\n이 파일을 수정하여 봇의 동작을 커스터마이즈하세요.\n', 'utf-8');
+    }
+    logger.info('.clackbot/CLAUDE.md 생성됨');
+  }
+
+  // rules/ 디렉토리
+  const rulesDir = path.join(localDir, 'rules');
+  if (!fs.existsSync(rulesDir)) {
+    fs.mkdirSync(rulesDir, { recursive: true });
+  }
 }
 
 // 자동 업데이트 확인 — git clone 설치 환경에서만 동작
@@ -126,10 +149,14 @@ export async function startCommand(options: StartOptions): Promise<void> {
   const cwd = process.cwd();
 
   // .clackbot/ 존재 확인
-  if (!fs.existsSync(getLocalDir(cwd))) {
+  const localDir = getLocalDir(cwd);
+  if (!fs.existsSync(localDir)) {
     logger.error('.clackbot/ 디렉토리가 없습니다. 먼저 clackbot init을 실행하세요.');
     process.exit(1);
   }
+
+  // 기본 파일 확인 및 생성 (CLAUDE.md, rules/)
+  ensureDefaultFiles(localDir);
 
   // 자동 업데이트 확인
   await checkForUpdates(options.branch || 'main');

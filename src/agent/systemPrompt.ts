@@ -55,31 +55,51 @@ export function buildSystemPrompt(cwd: string): string {
 
 ${personalityPrompt}`);
 
-  // CLAUDE.md 읽기
+  // cwd는 .clackbot/ 디렉토리
+  // CLAUDE.md 읽기 (.clackbot/CLAUDE.md)
   const claudeMd = tryReadFile(path.join(cwd, 'CLAUDE.md'));
   if (claudeMd) {
     parts.push(`\n---\n# 프로젝트 규칙 (CLAUDE.md)\n${claudeMd}`);
   }
 
-  // rules.md 읽기
-  const rulesMd = tryReadFile(path.join(cwd, 'rules.md'));
-  if (rulesMd) {
-    parts.push(`\n---\n# 추가 규칙 (rules.md)\n${rulesMd}`);
+  // rules/ 폴더의 모든 .md 파일 읽기 (재귀)
+  const rulesDir = path.join(cwd, 'rules');
+  const ruleFiles = scanMdFiles(rulesDir);
+  for (const ruleFile of ruleFiles) {
+    const content = tryReadFile(ruleFile);
+    const relativePath = path.relative(cwd, ruleFile);
+    if (content) {
+      parts.push(`\n---\n# 규칙 (${relativePath})\n${content}`);
+    }
   }
 
-  // .clackbot/rules.md 읽기
-  const clackbotRules = tryReadFile(path.join(cwd, '.clackbot', 'rules.md'));
-  if (clackbotRules) {
-    parts.push(`\n---\n# Clackbot 규칙 (.clackbot/rules.md)\n${clackbotRules}`);
-  }
-
-  // 메모리 읽기
-  const memory = tryReadFile(path.join(cwd, '.clackbot', 'memory.md'));
+  // 메모리 읽기 (.clackbot/memory.md)
+  const memory = tryReadFile(path.join(cwd, 'memory.md'));
   if (memory && memory.trim() !== '# Clackbot 메모리') {
     parts.push(`\n---\n# 메모리\n${memory}`);
   }
 
   return parts.join('\n');
+}
+
+/** 디렉토리에서 .md 파일 재귀 탐색 */
+function scanMdFiles(dir: string): string[] {
+  if (!fs.existsSync(dir)) return [];
+  const results: string[] = [];
+  try {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        results.push(...scanMdFiles(fullPath));
+      } else if (entry.isFile() && entry.name.endsWith('.md')) {
+        results.push(fullPath);
+      }
+    }
+  } catch {
+    // 읽기 실패 시 무시
+  }
+  return results.sort();
 }
 
 function tryReadFile(filePath: string): string | null {

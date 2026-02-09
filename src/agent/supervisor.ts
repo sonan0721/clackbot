@@ -1,6 +1,7 @@
 import { query, type SDKMessage } from '@anthropic-ai/claude-code';
 import { EventEmitter } from 'node:events';
 import { loadConfig } from '../config/index.js';
+import { getLocalDir } from '../config/paths.js';
 import { getMcpServers } from './tools/loader.js';
 import { logger } from '../utils/logger.js';
 
@@ -11,8 +12,8 @@ export interface SupervisorEvent {
   data: string;
 }
 
-// 감시 대상 규칙 파일
-const WATCHED_FILES = ['CLAUDE.md', 'rules.md', '.clackbot/rules.md'];
+// 감시 대상 규칙 파일 (.clackbot/ 내부 기준)
+const WATCHED_FILES = ['CLAUDE.md', 'rules.md'];
 
 export class Supervisor extends EventEmitter {
   private resumeId?: string;
@@ -20,7 +21,7 @@ export class Supervisor extends EventEmitter {
   /** 사용자 메시지를 에이전트에 전달하고 결과를 이벤트로 emit */
   async send(message: string): Promise<void> {
     const config = loadConfig();
-    const cwd = process.cwd();
+    const cwd = getLocalDir();
 
     const systemPrompt = `당신은 Clackbot 슈퍼바이저입니다.
 봇의 규칙 파일을 편집하고, 설정을 관리하며, Slack 명령을 실행할 수 있습니다.

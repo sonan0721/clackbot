@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { loadConfig, saveConfig } from '../config/index.js';
-import { getPluginsDir } from '../config/paths.js';
+import { getLocalDir, getPluginsDir } from '../config/paths.js';
 import { logger } from '../utils/logger.js';
 
 // 플러그인 설치 전용 에이전트
@@ -19,7 +19,7 @@ export class PluginInstaller extends EventEmitter {
   /** 사용자 메시지를 에이전트에 전달하고 결과를 이벤트로 emit */
   async send(message: string): Promise<void> {
     const config = loadConfig();
-    const cwd = process.cwd();
+    const cwd = getLocalDir();
 
     const systemPrompt = `당신은 Clackbot 플러그인 설치 전문가입니다.
 사용자가 원하는 서비스의 MCP 서버를 검색하고 설치를 도와줍니다.

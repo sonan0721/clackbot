@@ -1,6 +1,7 @@
 import { queryAgent } from '../../agent/claude.js';
 import { sessionManager } from '../../session/manager.js';
 import { saveConversation } from '../../store/conversations.js';
+import { getLocalDir } from '../../config/paths.js';
 import { truncateText } from '../../utils/slackFormat.js';
 import { logger } from '../../utils/logger.js';
 
@@ -21,7 +22,7 @@ export async function handleMessage(params: HandleMessageParams): Promise<void> 
   const { inputText, userId, channelId, threadTs, threadMessages, say, replyInChannel } = params;
 
   try {
-    const cwd = process.cwd();
+    const cwd = getLocalDir();
 
     // 세션 관리
     const session = sessionManager.getOrCreate(threadTs);

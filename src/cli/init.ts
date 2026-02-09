@@ -56,6 +56,25 @@ export async function initCommand(): Promise<void> {
     logger.warn('.clackbot/config.json 이미 존재합니다.');
   }
 
+  // CLAUDE.md 생성 (봇 헌법)
+  const claudeMdDest = path.join(clackbotDir, 'CLAUDE.md');
+  if (!fs.existsSync(claudeMdDest)) {
+    const claudeMdSrc = path.join(templatesDir, 'CLAUDE.md');
+    if (fs.existsSync(claudeMdSrc)) {
+      fs.copyFileSync(claudeMdSrc, claudeMdDest);
+    } else {
+      fs.writeFileSync(claudeMdDest, '# Clackbot 규칙\n\n이 파일을 수정하여 봇의 동작을 커스터마이즈하세요.\n', 'utf-8');
+    }
+    logger.success('.clackbot/CLAUDE.md 생성');
+  }
+
+  // rules/ 디렉토리 생성
+  const rulesDir = path.join(clackbotDir, 'rules');
+  if (!fs.existsSync(rulesDir)) {
+    fs.mkdirSync(rulesDir, { recursive: true });
+    logger.success('.clackbot/rules/ 디렉토리 생성');
+  }
+
   // memory.md 생성
   const memoryPath = path.join(clackbotDir, 'memory.md');
   if (!fs.existsSync(memoryPath)) {
