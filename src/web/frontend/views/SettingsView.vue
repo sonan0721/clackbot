@@ -52,13 +52,6 @@
     <div class="card">
       <h2>봇 설정</h2>
       <div class="form-group" style="margin-top: 16px;">
-        <label>접근 모드</label>
-        <select v-model="accessMode" class="form-control" style="max-width: 300px;">
-          <option value="owner">소유자 전용 (owner)</option>
-          <option value="public">공개 (public)</option>
-        </select>
-      </div>
-      <div class="form-group">
         <label>소유자 Slack User ID</label>
         <select v-if="usersLoaded" v-model="ownerUserId" class="form-control" style="max-width: 300px;">
           <option value="">선택 안 함</option>
@@ -123,7 +116,6 @@ import type { ConfigResponse, SlackUser } from '../types/api'
 
 const preset = ref<string>('istj')
 const customPrompt = ref('')
-const accessMode = ref('owner')
 const ownerUserId = ref('')
 const maxMessages = ref(50)
 const timeoutMinutes = ref(30)
@@ -166,7 +158,6 @@ onMounted(async () => {
     const config = await api<ConfigResponse>('/api/config')
     preset.value = config.personality?.preset || 'istj'
     customPrompt.value = config.personality?.customPrompt || ''
-    accessMode.value = config.accessMode
     ownerUserId.value = config.ownerUserId || ''
     maxMessages.value = config.session?.maxMessages || 50
     timeoutMinutes.value = config.session?.timeoutMinutes || 30
@@ -201,7 +192,6 @@ async function saveSettings() {
   }
 
   const updates = {
-    accessMode: accessMode.value,
     ownerUserId: ownerUserId.value || undefined,
     webPort: webPort.value,
     session: {

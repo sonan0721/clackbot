@@ -43,7 +43,6 @@ export async function initCommand(): Promise<void> {
       // 템플릿 파일이 없으면 기본 config 직접 생성
       const defaultConfig = {
         slack: {},
-        accessMode: 'owner',
         session: { maxMessages: 50, timeoutMinutes: 30 },
         webPort: 3847,
         projects: [],

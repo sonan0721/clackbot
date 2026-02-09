@@ -3,7 +3,7 @@ import { logger } from '../utils/logger.js';
 
 // clackbot config set <key> <value> — 설정 변경
 
-const ALLOWED_KEYS = ['accessMode', 'webPort', 'ownerUserId', 'session.maxMessages', 'session.timeoutMinutes'] as const;
+const ALLOWED_KEYS = ['webPort', 'ownerUserId', 'session.maxMessages', 'session.timeoutMinutes'] as const;
 
 export async function configSetCommand(key: string, value: string): Promise<void> {
   if (!ALLOWED_KEYS.includes(key as typeof ALLOWED_KEYS[number])) {
@@ -15,14 +15,6 @@ export async function configSetCommand(key: string, value: string): Promise<void
   const config = loadConfig();
 
   switch (key) {
-    case 'accessMode':
-      if (value !== 'owner' && value !== 'public') {
-        logger.error('accessMode는 "owner" 또는 "public"이어야 합니다.');
-        process.exit(1);
-      }
-      config.accessMode = value;
-      break;
-
     case 'webPort': {
       const port = parseInt(value, 10);
       if (isNaN(port) || port < 1 || port > 65535) {

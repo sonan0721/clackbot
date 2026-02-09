@@ -5,17 +5,29 @@ import { loadConfig, saveConfig } from '../../config/index.js';
 
 const router = Router();
 
+/** 민감 값 마스킹: 앞 4자 + *** + 뒤 4자 (짧으면 앞뒤 2자) */
+function maskSecret(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  if (value.length <= 8) return value.slice(0, 2) + '***' + value.slice(-2);
+  return value.slice(0, 4) + '***' + value.slice(-4);
+}
+
 // 설정 조회
 router.get('/', (_req, res) => {
   const config = loadConfig();
+
+  // process.env fallback 반영 (start.ts와 동일한 로직)
+  const botToken = config.slack.botToken || process.env.SLACK_BOT_TOKEN;
+  const appToken = config.slack.appToken || process.env.SLACK_APP_TOKEN;
 
   // 민감 정보 마스킹
   const safeConfig = {
     ...config,
     slack: {
       ...config.slack,
-      botToken: config.slack.botToken ? '***' + config.slack.botToken.slice(-6) : undefined,
-      appToken: config.slack.appToken ? '***' + config.slack.appToken.slice(-6) : undefined,
+      botUserId: maskSecret(config.slack.botUserId),
+      botToken: maskSecret(botToken),
+      appToken: maskSecret(appToken),
     },
   };
 
@@ -29,14 +41,6 @@ router.put('/', (req, res) => {
     const updates = req.body;
 
     // 변경 가능한 필드만 허용
-    if (updates.accessMode !== undefined) {
-      if (!['owner', 'public'].includes(updates.accessMode)) {
-        res.status(400).json({ error: 'accessMode는 "owner" 또는 "public"이어야 합니다.' });
-        return;
-      }
-      config.accessMode = updates.accessMode;
-    }
-
     if (updates.webPort !== undefined) {
       const port = Number(updates.webPort);
       if (!Number.isInteger(port) || port < 1 || port > 65535) {

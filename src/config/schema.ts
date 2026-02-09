@@ -12,9 +12,6 @@ export const ConfigSchema = z.object({
     teamName: z.string().optional(),
   }).default({}),
 
-  // 접근 모드: owner(소유자 전용) / public(누구나)
-  accessMode: z.enum(['owner', 'public']).default('owner'),
-
   // 소유자 Slack User ID (login 시 자동 감지)
   ownerUserId: z.string().optional(),
 

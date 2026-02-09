@@ -281,7 +281,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
     }
 
     logger.blank();
-    logger.success(`봇 이름: @${botName} | 접근 모드: ${config.accessMode}`);
+    logger.success(`봇 이름: @${botName}`);
     if (enableWeb) {
       const port = parseInt(options.port || String(config.webPort), 10);
       logger.success(`대시보드: http://localhost:${port}`);
@@ -307,14 +307,13 @@ export async function startCommand(options: StartOptions): Promise<void> {
             `:white_check_mark: *${botName} v${APP_VERSION} 시작됨*`,
             '',
             '*현재 설정*',
-            `• 접근 모드: \`${config.accessMode}\``,
             `• 성격 프리셋: \`${config.personality?.preset ?? 'istj'}\``,
             `• 세션: 최대 ${config.session?.maxMessages ?? 50}개 메시지 / ${config.session?.timeoutMinutes ?? 30}분 타임아웃`,
             `• 대시보드: ${webInfo}`,
             `• MCP 서버: ${mcpInfo}`,
             '',
             '*DM으로 할 수 있는 것들*',
-            '• 설정 변경 — "접근 모드를 public으로 바꿔줘", "성격을 enfp로 바꿔줘"',
+            '• 설정 변경 — "성격을 enfp로 바꿔줘", "세션 타임아웃을 60분으로 변경해줘"',
             '• MCP 서버 관리 — "Trello MCP 서버 설치해줘", "MCP 서버 목록 보여줘"',
             '• 규칙 편집 — "CLAUDE.md 보여줘", "응답 규칙에 이모지 금지 추가해줘"',
             '• 스킬 관리 — "새 스킬 만들어줘", "스킬 목록 보여줘"',

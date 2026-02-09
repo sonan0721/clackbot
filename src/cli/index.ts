@@ -45,7 +45,7 @@ program
   .command('config')
   .description('설정 관리')
   .command('set <key> <value>')
-  .description('설정값 변경 (예: accessMode public)')
+  .description('설정값 변경 (예: webPort 3847)')
   .action(async (key: string, value: string) => {
     const { configSetCommand } = await import('./configSet.js');
     await configSetCommand(key, value);

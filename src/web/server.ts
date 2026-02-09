@@ -37,7 +37,6 @@ export function createWebServer() {
       botName: config.slack.botName || null,
       botUserId: config.slack.botUserId || null,
       teamName: config.slack.teamName || null,
-      accessMode: config.accessMode,
       webPort: config.webPort,
     });
   });

@@ -6,7 +6,6 @@ export interface StatusResponse {
   botName: string | null
   botUserId: string | null
   teamName: string | null
-  accessMode: 'owner' | 'public'
   webPort: number
 }
 
@@ -61,7 +60,6 @@ export interface ToolsResponse {
 }
 
 export interface ConfigResponse {
-  accessMode: 'owner' | 'public'
   ownerUserId?: string
   webPort: number
   session: {

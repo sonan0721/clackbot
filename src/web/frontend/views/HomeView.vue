@@ -11,10 +11,6 @@
         <div class="value">{{ status.teamName || '미연결' }}</div>
       </div>
       <div class="stat-card">
-        <div class="label">접근 모드</div>
-        <div class="value">{{ status.accessMode === 'public' ? '공개' : '소유자 전용' }}</div>
-      </div>
-      <div class="stat-card">
         <div class="label">등록된 도구</div>
         <div class="value">{{ toolsTotal }}개</div>
       </div>
