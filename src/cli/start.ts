@@ -10,6 +10,7 @@ import { initDatabase, closeDatabase } from '../store/conversations.js';
 import { setSlackClient } from '../agent/tools/builtin/slackPost.js';
 import { setSharedSlackClient } from '../slack/client.js';
 import { sessionManager } from '../session/manager.js';
+import semver from 'semver';
 import { logger } from '../utils/logger.js';
 
 // clackbot start — Slack 봇 + 웹 대시보드 동시 기동
@@ -47,44 +48,31 @@ async function checkForUpdates(branch: string): Promise<void> {
       ...shellOpt,
     });
 
-    // 로컬 HEAD vs 원격 HEAD 비교
-    const local = execFileSync('git', ['rev-parse', 'HEAD'], {
-      cwd: installDir,
-      encoding: 'utf-8',
-      ...shellOpt,
-    }).trim();
-    const remote = execFileSync('git', ['rev-parse', `origin/${branch}`], {
-      cwd: installDir,
-      encoding: 'utf-8',
-      ...shellOpt,
-    }).trim();
-
-    if (local === remote) {
-      logger.success('최신 버전입니다.');
-      return;
-    }
-
-    // 업데이트 전 버전 읽기
-    let oldVersion = '?';
+    // 로컬 버전 읽기
+    let localVersion = '0.0.0';
     try {
       const pkg = JSON.parse(fs.readFileSync(path.join(installDir, 'package.json'), 'utf-8'));
-      oldVersion = pkg.version || '?';
+      localVersion = pkg.version || '0.0.0';
     } catch { /* 무시 */ }
 
-    // remote가 local보다 앞선 커밋 수 (behind 수)
-    const behindCount = execFileSync(
-      'git',
-      ['rev-list', '--count', `HEAD..origin/${branch}`],
-      { cwd: installDir, encoding: 'utf-8', ...shellOpt },
-    ).trim();
+    // 원격 package.json에서 버전 읽기
+    let remoteVersion = '0.0.0';
+    try {
+      const remotePkg = execFileSync(
+        'git',
+        ['show', `origin/${branch}:package.json`],
+        { cwd: installDir, encoding: 'utf-8', ...shellOpt },
+      );
+      remoteVersion = JSON.parse(remotePkg).version || '0.0.0';
+    } catch { /* 무시 */ }
 
-    // behind=0이면 로컬에 미푸시 커밋만 있는 상태 → 업데이트 불필요
-    if (behindCount === '0') {
-      logger.success('최신 버전입니다.');
+    // semver 비교: 원격이 더 높을 때만 업데이트
+    if (!semver.gt(remoteVersion, localVersion)) {
+      logger.success(`최신 버전입니다. (v${localVersion})`);
       return;
     }
 
-    logger.info(`새 업데이트 발견 (${behindCount}개 커밋). 업데이트 중...`);
+    logger.info(`새 버전 발견 (v${localVersion} → v${remoteVersion}). 업데이트 중...`);
 
     // 브랜치 전환 (필요시)
     const currentBranch = execFileSync(
@@ -126,14 +114,7 @@ async function checkForUpdates(branch: string): Promise<void> {
       ...shellOpt,
     });
 
-    // 업데이트 후 버전 읽기
-    let newVersion = '?';
-    try {
-      const pkg = JSON.parse(fs.readFileSync(path.join(installDir, 'package.json'), 'utf-8'));
-      newVersion = pkg.version || '?';
-    } catch { /* 무시 */ }
-
-    logger.success(`업데이트 완료! (v${oldVersion} → v${newVersion}) 변경사항을 적용하려면 clackbot start를 다시 실행하세요.`);
+    logger.success(`업데이트 완료! (v${localVersion} → v${remoteVersion}) 변경사항을 적용하려면 clackbot start를 다시 실행하세요.`);
     process.exit(0);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
