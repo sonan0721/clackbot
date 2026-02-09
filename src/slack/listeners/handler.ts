@@ -9,6 +9,9 @@ import { logger } from '../../utils/logger.js';
 
 // 메시지 처리 공통 핸들러
 
+/** 대화 모드: channel(채널 1회성), thread(스레드 작업), dm(DM 비서) */
+export type ConversationMode = 'channel' | 'thread' | 'dm';
+
 export interface HandleMessageParams {
   inputText: string;
   userId: string;
@@ -18,19 +21,19 @@ export interface HandleMessageParams {
   say: (params: { text: string; thread_ts?: string }) => Promise<unknown>;
   client: WebClient;
   isOwner: boolean;
-  /** true면 스레드 대신 채널에 직접 응답 */
-  replyInChannel?: boolean;
+  /** 대화 모드 */
+  mode: ConversationMode;
   /** 첨부파일 */
   attachments?: Attachment[];
-  /** 컨텍스트 (DM or 멘션) */
-  context?: 'dm' | 'mention';
 }
 
 export async function handleMessage(params: HandleMessageParams): Promise<void> {
   const {
     inputText, userId, channelId, threadTs, threadMessages,
-    say, client, isOwner, replyInChannel, attachments, context = 'mention',
+    say, client, isOwner, mode, attachments,
   } = params;
+
+  const replyInChannel = mode === 'channel';
 
   // "생각 중..." 메시지 전송
   const handlerConfig = loadConfig();
@@ -50,75 +53,91 @@ export async function handleMessage(params: HandleMessageParams): Promise<void> 
   try {
     const cwd = getLocalDir();
 
-    // 세션 관리
-    const session = sessionManager.getOrCreate(threadTs);
+    // 세션 관리 (channel 모드는 1회성 → 세션 스킵)
+    let sessionId: string;
+    let resumeId: string | undefined;
+    let sessionMessageCount = 0;
 
-    logger.debug(`처리 시작: "${inputText.slice(0, 50)}..."`);
+    if (mode === 'channel') {
+      sessionId = `channel-${Date.now()}`;
+    } else {
+      const session = sessionManager.getOrCreate(threadTs);
+      sessionId = session.id;
+      resumeId = session.resumeId;
+      sessionMessageCount = session.messageCount;
+    }
 
-    // 생각 중 메시지 실시간 업데이트 (쓰로틀링: 2초 간격)
-    let lastUpdateTime = 0;
-    let pendingStatus: string | null = null;
+    logger.debug(`처리 시작 [${mode}]: "${inputText.slice(0, 50)}..."`);
+
+    // 생각 중 메시지 실시간 업데이트 (channel 모드는 도구 없으므로 스킵)
+    let onProgress: ((status: string) => void) | undefined;
     let updateTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const flushThinkingUpdate = async (status: string) => {
-      if (!thinkingTs) return;
-      const thinkingText = `:hourglass_flowing_sand: ${thinkingMessage}\n\n\`\`\`\n${status}\n\`\`\``;
-      try {
-        await client.chat.update({
-          channel: channelId,
-          ts: thinkingTs,
-          text: thinkingText,
-        });
-      } catch {
-        // rate limit 등으로 실패 시 무시
-      }
-    };
+    if (mode !== 'channel') {
+      let lastUpdateTime = 0;
+      let pendingStatus: string | null = null;
 
-    const onProgress = (status: string) => {
-      const now = Date.now();
-      if (now - lastUpdateTime >= 2000) {
-        lastUpdateTime = now;
-        pendingStatus = null;
-        if (updateTimer) { clearTimeout(updateTimer); updateTimer = null; }
-        flushThinkingUpdate(status);
-      } else {
-        // 다음 업데이트 주기에 전송
-        pendingStatus = status;
-        if (!updateTimer) {
-          const delay = 2000 - (now - lastUpdateTime);
-          updateTimer = setTimeout(() => {
-            updateTimer = null;
-            if (pendingStatus) {
-              lastUpdateTime = Date.now();
-              flushThinkingUpdate(pendingStatus);
-              pendingStatus = null;
-            }
-          }, delay);
+      const flushThinkingUpdate = async (status: string) => {
+        if (!thinkingTs) return;
+        const thinkingText = `:hourglass_flowing_sand: ${thinkingMessage}\n\n\`\`\`\n${status}\n\`\`\``;
+        try {
+          await client.chat.update({
+            channel: channelId,
+            ts: thinkingTs,
+            text: thinkingText,
+          });
+        } catch {
+          // rate limit 등으로 실패 시 무시
         }
-      }
-    };
+      };
+
+      onProgress = (status: string) => {
+        const now = Date.now();
+        if (now - lastUpdateTime >= 2000) {
+          lastUpdateTime = now;
+          pendingStatus = null;
+          if (updateTimer) { clearTimeout(updateTimer); updateTimer = null; }
+          flushThinkingUpdate(status);
+        } else {
+          pendingStatus = status;
+          if (!updateTimer) {
+            const delay = 2000 - (now - lastUpdateTime);
+            updateTimer = setTimeout(() => {
+              updateTimer = null;
+              if (pendingStatus) {
+                lastUpdateTime = Date.now();
+                flushThinkingUpdate(pendingStatus);
+                pendingStatus = null;
+              }
+            }, delay);
+          }
+        }
+      };
+    }
 
     // Claude Agent 호출
     const response = await queryAgent({
       prompt: inputText,
       cwd,
       threadMessages,
-      sessionId: session.id,
-      resumeId: session.resumeId,
+      sessionId,
+      resumeId,
       isOwner,
       attachments,
-      context,
+      mode,
       onProgress,
     });
 
     // 남은 타이머 정리
     if (updateTimer) clearTimeout(updateTimer);
 
-    // 세션 업데이트
-    sessionManager.update(threadTs, {
-      resumeId: response.resumeId,
-      messageCount: session.messageCount + 1,
-    });
+    // 세션 업데이트 (channel 모드는 스킵)
+    if (mode !== 'channel') {
+      sessionManager.update(threadTs, {
+        resumeId: response.resumeId,
+        messageCount: sessionMessageCount + 1,
+      });
+    }
 
     // 응답 전송 — "생각 중..." 메시지를 교체
     const responseText = truncateText(response.text);

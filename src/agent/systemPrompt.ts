@@ -305,32 +305,44 @@ allowed-tools: Read, Grep
  * 프로젝트 디렉토리에서 규칙 파일들을 읽어 시스템 프롬프트 구성
  * 우선순위: CLAUDE.md > rules.md > .clackbot/rules.md
  */
-export function buildSystemPrompt(cwd: string, context: 'dm' | 'mention' = 'mention'): string {
+export function buildSystemPrompt(cwd: string, context: 'dm' | 'mention' | 'channel' = 'mention'): string {
   const parts: string[] = [];
   const config = loadConfig();
-
-  // 성격 preset 적용
-  const preset = config.personality?.preset ?? 'istj';
-  let personalityPrompt: string;
-
-  if (preset === 'custom' && config.personality?.customPrompt) {
-    personalityPrompt = config.personality.customPrompt;
-  } else {
-    personalityPrompt = PERSONALITY_PRESETS[preset] ?? PERSONALITY_PRESETS.istj;
-  }
-
-  // 기본 역할 정의
   const botName = config.slack?.botName || '비서봇';
-  parts.push(`당신은 ${botName}이며, 사용자의 개인 Slack 비서입니다.
+
+  if (context === 'channel') {
+    // 채널 모드: 성격 프리셋 대신 캐주얼 톤 전용
+    parts.push(`당신은 ${botName}이며, Slack 채널에서 캐주얼하게 대화하는 비서입니다.
+
+채널 모드 규칙:
+- 짧고 캐주얼하게 답변하세요 (1~3줄)
+- 도구를 사용할 수 없습니다 — 파일 읽기, 검색, 명령 실행 등 불가
+- 복잡한 작업이나 도구가 필요한 요청에는 "스레드에서 멘션하거나 DM으로 요청해 주세요"라고 안내하세요
+- 첨부파일이 언급되면 "스레드나 DM에서 다시 보내주시면 확인할 수 있어요"라고 안내하세요
+- 가볍고 친근한 톤을 사용하세요
+- 한국어로 답변하세요`);
+  } else {
+    // thread/dm 모드: 성격 프리셋 적용
+    const preset = config.personality?.preset ?? 'istj';
+    let personalityPrompt: string;
+
+    if (preset === 'custom' && config.personality?.customPrompt) {
+      personalityPrompt = config.personality.customPrompt;
+    } else {
+      personalityPrompt = PERSONALITY_PRESETS[preset] ?? PERSONALITY_PRESETS.istj;
+    }
+
+    parts.push(`당신은 ${botName}이며, 사용자의 개인 Slack 비서입니다.
 사용자를 대신하여 Slack 메시지를 작성하고 업무를 보조합니다.
 
 ${personalityPrompt}`);
+  }
 
   // 컨텍스트별 규칙
   if (context === 'dm') {
     const projectRoot = path.resolve(cwd, '..');
     parts.push(buildDmSection(cwd, projectRoot, config));
-  } else {
+  } else if (context === 'mention') {
     parts.push(`\n글로벌 규칙:
 - 사용자에게 config.json이나 설정 파일을 직접 편집하라고 안내하지 마세요
 - MCP 서버 설치/설정이 필요하면 Owner에게 DM으로 요청하라고 안내하세요

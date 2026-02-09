@@ -83,7 +83,7 @@ export function registerDirectMessage(app: App): void {
         client,
         isOwner,
         attachments,
-        context: 'dm',
+        mode: 'dm',
       });
     } finally {
       // 다운로드된 파일 정리

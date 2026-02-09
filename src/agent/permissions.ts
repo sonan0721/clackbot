@@ -1,35 +1,27 @@
 import type { CanUseTool, PermissionResult } from '@anthropic-ai/claude-code';
+import type { ConversationMode } from '../slack/listeners/handler.js';
 
-// 안전 정책 — canUseTool 콜백 (역할 기반 이원화)
-
-// 읽기 전용 도구 (비Owner 포함 기본 허용)
-const READ_ONLY_TOOLS = new Set([
-  'Read',
-  'Grep',
-  'Glob',
-  'WebSearch',
-  'WebFetch',
-  'Task',
-]);
-
-// 쓰기/실행 도구 (Owner만 허용)
-const WRITE_TOOLS = new Set([
-  'Write',
-  'Edit',
-  'Bash',
-  'NotebookEdit',
-]);
+// 안전 정책 — canUseTool 콜백 (역할 + 모드 기반)
 
 /**
- * 역할 기반 canUseTool 팩토리
- * - Owner: 모든 도구 허용 (Read, Write, Edit, Bash, MCP 등)
- * - 비Owner: 모든 도구 차단 (일반 대화만 가능)
+ * 역할 + 모드 기반 canUseTool 팩토리
+ * - channel 모드: 모든 도구 차단 (Owner 포함)
+ * - thread/dm 모드 Owner: 모든 도구 허용
+ * - thread/dm 모드 비Owner: 모든 도구 차단
  */
-export function createCanUseTool(isOwner: boolean, botName = '비서봇'): CanUseTool {
+export function createCanUseTool(isOwner: boolean, botName = '비서봇', mode: ConversationMode = 'thread'): CanUseTool {
   return async (
     toolName,
     input,
   ): Promise<PermissionResult> => {
+    // channel 모드: Owner 포함 모든 도구 차단
+    if (mode === 'channel') {
+      return {
+        behavior: 'deny',
+        message: `${botName}: 채널 대화에서는 도구를 사용할 수 없습니다. 스레드나 DM에서 요청해 주세요.`,
+      };
+    }
+
     if (isOwner) {
       // Owner: 모든 도구 허용
       return { behavior: 'allow', updatedInput: input };

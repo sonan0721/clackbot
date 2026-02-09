@@ -4,6 +4,7 @@ import { createCanUseTool } from './permissions.js';
 import { getMcpServers } from './tools/loader.js';
 import { loadConfig } from '../config/index.js';
 import { logger } from '../utils/logger.js';
+import type { ConversationMode } from '../slack/listeners/handler.js';
 
 // Claude Agent SDK query() 래퍼
 
@@ -52,7 +53,8 @@ export interface QueryParams {
   resumeId?: string;
   isOwner: boolean;
   attachments?: Attachment[];
-  context?: 'dm' | 'mention';
+  /** 대화 모드 */
+  mode: ConversationMode;
   /** 스트리밍 중 진행 상태 콜백 (도구 사용, 텍스트 생성 등) */
   onProgress?: (status: string) => void;
 }
@@ -67,7 +69,10 @@ export interface QueryResult {
  * Claude Agent SDK를 사용하여 응답 생성
  */
 export async function queryAgent(params: QueryParams): Promise<QueryResult> {
-  const { prompt, cwd, threadMessages, resumeId, isOwner, attachments, context = 'mention', onProgress } = params;
+  const { prompt, cwd, threadMessages, resumeId, isOwner, attachments, mode, onProgress } = params;
+
+  // mode → 시스템 프롬프트 컨텍스트 매핑
+  const promptContext = mode === 'channel' ? 'channel' : mode === 'dm' ? 'dm' : 'mention' as const;
 
   // 스레드 컨텍스트를 프롬프트에 포함
   let fullPrompt = prompt;
@@ -90,15 +95,15 @@ export async function queryAgent(params: QueryParams): Promise<QueryResult> {
   }
 
   // 시스템 프롬프트 생성 (컨텍스트 분리)
-  const systemPrompt = buildSystemPrompt(cwd, context);
+  const systemPrompt = buildSystemPrompt(cwd, promptContext);
 
-  // MCP 서버 설정 (내장 + 플러그인)
-  const mcpServers = getMcpServers(cwd);
+  // MCP 서버 설정 (channel 모드는 도구 불가 → MCP 프로세스 불필요)
+  const mcpServers = mode === 'channel' ? {} : getMcpServers(cwd);
 
-  // 역할 기반 권한
+  // 역할 + 모드 기반 권한
   const config = loadConfig();
   const botName = config.slack?.botName || '비서봇';
-  const canUseTool = createCanUseTool(isOwner, botName);
+  const canUseTool = createCanUseTool(isOwner, botName, mode);
 
   // Agent SDK 호출
   const toolsUsed: string[] = [];
@@ -113,7 +118,7 @@ export async function queryAgent(params: QueryParams): Promise<QueryResult> {
         cwd,
         canUseTool,
         mcpServers,
-        maxTurns: isOwner ? 20 : 10,
+        maxTurns: mode === 'channel' ? 5 : isOwner ? 20 : 10,
         ...(resumeId ? { resume: resumeId } : {}),
       },
     });
