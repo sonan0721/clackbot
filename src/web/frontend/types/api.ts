@@ -90,28 +90,23 @@ export interface SupervisorFile {
   exists: boolean
 }
 
-export interface RulesFile {
-  filename: string
-  path: string
-}
-
 export interface FileContentResponse {
   content: string
   exists: boolean
 }
 
-export interface SkillSummary {
-  slug: string
-  name: string
-  description: string
+export interface SupervisorSession {
+  id: string
+  title: string
+  messageCount: number
+  createdAt: string
+  updatedAt: string
 }
 
-export interface SkillDetail {
-  slug: string
-  name: string
-  description: string
-  prompt: string
-  rawContent: string
+export interface ChatMessage {
+  role: 'user' | 'assistant' | 'tool'
+  content: string
+  timestamp: string
 }
 
 export interface SlackUser {

@@ -15,7 +15,7 @@ export interface SupervisorEvent {
 // 감시 대상 규칙 파일 (.clackbot/ 내부 기준)
 const WATCHED_FILES = ['CLAUDE.md', 'rules.md'];
 // rules/ 폴더 내 파일도 감시 (경로에 'rules/' 포함 여부로 판별)
-const WATCHED_DIRS = ['rules/', 'skills/'];
+const WATCHED_DIRS = ['rules/'];
 
 export class Supervisor extends EventEmitter {
   private resumeId?: string;
@@ -29,16 +29,13 @@ export class Supervisor extends EventEmitter {
 봇의 규칙 파일을 편집하고, 설정을 관리하며, Slack 명령을 실행할 수 있습니다.
 
 작업 가능 범위:
-1. 규칙 파일 편집: CLAUDE.md, rules/ 폴더 내 .md 파일
-2. 스킬 관리: skills/ 폴더 내 .md 파일 (YAML frontmatter + 프롬프트)
-3. 봇 설정 확인 및 조언
-4. Slack 채널에 메시지 전송 (slack_post 도구)
-5. 웹 검색, 파일 읽기 등 일반 도구 사용
+1. 규칙 파일 편집: CLAUDE.md
+2. 봇 설정 확인 및 조언
+3. Slack 채널에 메시지 전송 (slack_post 도구)
+4. 웹 검색, 파일 읽기 등 일반 도구 사용
 
 규칙 파일 구조:
 - .clackbot/CLAUDE.md: 봇의 기본 규칙
-- .clackbot/rules/*.md: 추가 규칙 파일 (재귀 탐색)
-- .clackbot/skills/*.md: 스킬 파일 (YAML frontmatter로 name, description 정의)
 
 현재 설정:
 - 접근 모드: ${config.accessMode}

@@ -11,8 +11,7 @@
       <li><router-link to="/conversations" class="nav-link" :class="{ active: route.path === '/conversations' }">대화 이력</router-link></li>
       <li><router-link to="/tools" class="nav-link" :class="{ active: route.path === '/tools' }">연동 툴</router-link></li>
       <li><router-link to="/supervisor" class="nav-link" :class="{ active: route.path === '/supervisor' }">슈퍼바이저</router-link></li>
-      <li><router-link to="/skills" class="nav-link" :class="{ active: route.path === '/skills' }">스킬</router-link></li>
-      <li><router-link to="/settings" class="nav-link" :class="{ active: route.path === '/settings' }">설정</router-link></li>
+<li><router-link to="/settings" class="nav-link" :class="{ active: route.path === '/settings' }">설정</router-link></li>
       <li v-if="dashboardPlugins.length > 0" class="nav-divider"></li>
     </ul>
     <div v-if="dashboardPlugins.length > 0">

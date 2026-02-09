@@ -1,46 +1,137 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Router, type Request, type Response } from 'express';
-import { getLocalDir, getRulesDir } from '../../config/paths.js';
+import { getLocalDir } from '../../config/paths.js';
 import { Supervisor, type SupervisorEvent } from '../../agent/supervisor.js';
 
-// SSE + 사용자 입력 + 파일 편집 API — 슈퍼바이저 콘솔
+// SSE + 다중 세션 + 파일 편집 API — 슈퍼바이저
 
 const router = Router();
 
-// 싱글턴 슈퍼바이저 에이전트
-let supervisor: Supervisor | null = null;
+// ─── 다중 세션 관리 ───
 
-// SSE 클라이언트 목록
-const sseClients: Set<Response> = new Set();
-
-// 규칙 파일 slug → .clackbot/ 내 상대 경로 매핑
-const ALLOWED_FILES: Record<string, string> = {
-  'claude-md': 'CLAUDE.md',
-  'rules-md': 'rules.md',
-};
-
-function getSupervisor(): Supervisor {
-  if (!supervisor) {
-    supervisor = new Supervisor();
-    supervisor.on('event', (event: SupervisorEvent) => {
-      broadcast(event);
-    });
-  }
-  return supervisor;
+interface ChatMessage {
+  role: 'user' | 'assistant' | 'tool'
+  content: string
+  timestamp: string
 }
 
-function broadcast(event: SupervisorEvent): void {
+interface SupervisorSession {
+  id: string
+  title: string
+  messages: ChatMessage[]
+  supervisor: Supervisor
+  createdAt: string
+  updatedAt: string
+  sseClients: Set<Response>
+}
+
+const sessions = new Map<string, SupervisorSession>();
+let sessionCounter = 0;
+
+function createSession(): SupervisorSession {
+  const id = `sv-${++sessionCounter}-${Date.now()}`;
+  const now = new Date().toISOString();
+  const session: SupervisorSession = {
+    id,
+    title: '새 대화',
+    messages: [],
+    supervisor: new Supervisor(),
+    createdAt: now,
+    updatedAt: now,
+    sseClients: new Set(),
+  };
+
+  // 이벤트 포워딩
+  session.supervisor.on('event', (event: SupervisorEvent) => {
+    // 메시지 저장
+    if (event.type === 'text') {
+      session.messages.push({
+        role: 'assistant',
+        content: event.data,
+        timestamp: new Date().toISOString(),
+      });
+    } else if (event.type === 'tool_call') {
+      session.messages.push({
+        role: 'tool',
+        content: event.data,
+        timestamp: new Date().toISOString(),
+      });
+    }
+    session.updatedAt = new Date().toISOString();
+
+    // SSE 브로드캐스트
+    const data = JSON.stringify(event);
+    for (const client of session.sseClients) {
+      client.write(`data: ${data}\n\n`);
+    }
+
+    // CLAUDE.md 변경 감지 — 모든 세션의 클라이언트에 알림
+    if (event.type === 'file_changed') {
+      broadcastAll(event);
+    }
+  });
+
+  sessions.set(id, session);
+  return session;
+}
+
+/** 모든 세션의 모든 클라이언트에 이벤트 전송 */
+function broadcastAll(event: SupervisorEvent): void {
   const data = JSON.stringify(event);
-  for (const client of sseClients) {
-    client.write(`data: ${data}\n\n`);
+  for (const session of sessions.values()) {
+    for (const client of session.sseClients) {
+      client.write(`data: ${data}\n\n`);
+    }
   }
 }
 
-// ─── 콘솔 엔드포인트 ───
+// ─── 세션 API ───
 
-// GET /api/supervisor/events — SSE 스트림
-router.get('/events', (_req: Request, res: Response) => {
+// GET /api/supervisor/sessions — 세션 목록
+router.get('/sessions', (_req: Request, res: Response) => {
+  const list = Array.from(sessions.values()).map(s => ({
+    id: s.id,
+    title: s.title,
+    messageCount: s.messages.length,
+    createdAt: s.createdAt,
+    updatedAt: s.updatedAt,
+  }));
+  // 최신 순 정렬
+  list.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  res.json({ sessions: list });
+});
+
+// POST /api/supervisor/sessions — 새 세션 생성
+router.post('/sessions', (_req: Request, res: Response) => {
+  const session = createSession();
+  res.json({ id: session.id });
+});
+
+// DELETE /api/supervisor/sessions/:id — 세션 삭제
+router.delete('/sessions/:id', (req: Request, res: Response) => {
+  const session = sessions.get(req.params.id as string);
+  if (!session) {
+    res.status(404).json({ error: '세션을 찾을 수 없습니다.' });
+    return;
+  }
+
+  // SSE 클라이언트 정리
+  for (const client of session.sseClients) {
+    client.end();
+  }
+  sessions.delete(req.params.id as string);
+  res.json({ status: 'ok' });
+});
+
+// GET /api/supervisor/sessions/:id/events — 세션별 SSE 스트림
+router.get('/sessions/:id/events', (req: Request, res: Response) => {
+  const session = sessions.get(req.params.id as string);
+  if (!session) {
+    res.status(404).json({ error: '세션을 찾을 수 없습니다.' });
+    return;
+  }
+
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
@@ -48,48 +139,78 @@ router.get('/events', (_req: Request, res: Response) => {
     'Access-Control-Allow-Origin': '*',
   });
 
-  // 초기 연결 확인
   res.write(`data: ${JSON.stringify({ type: 'connected', data: '' })}\n\n`);
 
-  sseClients.add(res);
+  session.sseClients.add(res);
 
-  _req.on('close', () => {
-    sseClients.delete(res);
+  req.on('close', () => {
+    session.sseClients.delete(res);
   });
 });
 
-// POST /api/supervisor/send — 메시지 전송
-router.post('/send', async (req: Request, res: Response) => {
-  const { message } = req.body;
+// POST /api/supervisor/sessions/:id/send — 메시지 전송
+router.post('/sessions/:id/send', async (req: Request, res: Response) => {
+  const session = sessions.get(req.params.id as string);
+  if (!session) {
+    res.status(404).json({ error: '세션을 찾을 수 없습니다.' });
+    return;
+  }
 
+  const { message } = req.body;
   if (!message || typeof message !== 'string') {
     res.status(400).json({ error: '메시지가 필요합니다.' });
     return;
   }
 
-  const sv = getSupervisor();
+  // 제목 자동 설정 (첫 메시지)
+  if (session.messages.length === 0) {
+    session.title = message.slice(0, 50) + (message.length > 50 ? '...' : '');
+  }
 
-  // 사용자 입력을 SSE로 echo
-  broadcast({ type: 'text', data: `\n> ${message}\n` });
+  // 사용자 메시지 저장
+  session.messages.push({
+    role: 'user',
+    content: message,
+    timestamp: new Date().toISOString(),
+  });
+  session.updatedAt = new Date().toISOString();
 
-  // 비동기로 에이전트 실행 (SSE로 스트리밍)
+  // 사용자 입력 SSE echo
+  const echoData = JSON.stringify({ type: 'text', data: `\n> ${message}\n` });
+  for (const client of session.sseClients) {
+    client.write(`data: ${echoData}\n\n`);
+  }
+
   res.json({ status: 'ok' });
 
   // 에이전트 호출 (백그라운드)
-  sv.send(message).catch((err) => {
-    broadcast({ type: 'error', data: err instanceof Error ? err.message : String(err) });
+  session.supervisor.send(message).catch((err) => {
+    const errEvent: SupervisorEvent = {
+      type: 'error',
+      data: err instanceof Error ? err.message : String(err),
+    };
+    const errData = JSON.stringify(errEvent);
+    for (const client of session.sseClients) {
+      client.write(`data: ${errData}\n\n`);
+    }
   });
 });
 
-// POST /api/supervisor/reset — 세션 리셋
-router.post('/reset', (_req: Request, res: Response) => {
-  if (supervisor) {
-    supervisor.reset();
+// GET /api/supervisor/sessions/:id/messages — 메시지 히스토리
+router.get('/sessions/:id/messages', (req: Request, res: Response) => {
+  const session = sessions.get(req.params.id as string);
+  if (!session) {
+    res.status(404).json({ error: '세션을 찾을 수 없습니다.' });
+    return;
   }
-  res.json({ status: 'ok' });
+  res.json({ messages: session.messages });
 });
 
-// ─── 파일 편집 엔드포인트 ───
+// ─── 파일 편집 엔드포인트 (CLAUDE.md만) ───
+
+const ALLOWED_FILES: Record<string, string> = {
+  'claude-md': 'CLAUDE.md',
+};
 
 function resolveFilePath(slug: string): string | null {
   const relativePath = ALLOWED_FILES[slug];
@@ -97,7 +218,7 @@ function resolveFilePath(slug: string): string | null {
   return path.resolve(getLocalDir(), relativePath);
 }
 
-// GET /api/supervisor/files — 규칙 파일 목록 및 존재 여부
+// GET /api/supervisor/files — 파일 목록
 router.get('/files', (_req: Request, res: Response) => {
   const files = Object.entries(ALLOWED_FILES).map(([slug, relativePath]) => {
     const fullPath = path.resolve(getLocalDir(), relativePath);
@@ -107,11 +228,10 @@ router.get('/files', (_req: Request, res: Response) => {
       exists: fs.existsSync(fullPath),
     };
   });
-
   res.json({ files });
 });
 
-// GET /api/supervisor/files/:slug — 파일 내용 읽기
+// GET /api/supervisor/files/:slug — 파일 읽기
 router.get('/files/:slug', (req: Request, res: Response) => {
   const fullPath = resolveFilePath(req.params.slug as string);
   if (!fullPath) {
@@ -127,7 +247,7 @@ router.get('/files/:slug', (req: Request, res: Response) => {
   try {
     const content = fs.readFileSync(fullPath, 'utf-8');
     res.json({ content, exists: true });
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: '파일 읽기 실패' });
   }
 });
@@ -147,134 +267,12 @@ router.put('/files/:slug', (req: Request, res: Response) => {
   }
 
   try {
-    // 부모 디렉토리 자동 생성
     const dir = path.dirname(fullPath);
     fs.mkdirSync(dir, { recursive: true });
-
-    fs.writeFileSync(fullPath, content, 'utf-8');
-    res.json({ message: '파일이 저장되었습니다.' });
-  } catch (error) {
-    res.status(500).json({ error: '파일 저장 실패' });
-  }
-});
-
-// ─── rules/ 폴더 관리 엔드포인트 ───
-
-/** 디렉토리에서 .md 파일 재귀 탐색 */
-function scanMdFiles(dir: string, base: string): string[] {
-  if (!fs.existsSync(dir)) return [];
-  const results: string[] = [];
-  try {
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      const fullPath = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        results.push(...scanMdFiles(fullPath, base));
-      } else if (entry.isFile() && entry.name.endsWith('.md')) {
-        results.push(path.relative(base, fullPath));
-      }
-    }
-  } catch {
-    // 읽기 실패 시 무시
-  }
-  return results.sort();
-}
-
-/** filename 인코딩: `/` → `--` (path traversal 방지) */
-function decodeRulesFilename(encoded: string): string | null {
-  // `--`를 `/`로 변환
-  const decoded = encoded.replace(/--/g, '/');
-  // path traversal 방지
-  if (decoded.includes('..') || decoded.startsWith('/')) return null;
-  // .md 확장자 강제
-  if (!decoded.endsWith('.md')) return null;
-  return decoded;
-}
-
-function resolveRulesPath(filename: string): string | null {
-  const decoded = decodeRulesFilename(filename);
-  if (!decoded) return null;
-  const rulesDir = getRulesDir();
-  const resolved = path.resolve(rulesDir, decoded);
-  // rules/ 디렉토리 내에 있는지 검증
-  if (!resolved.startsWith(path.resolve(rulesDir))) return null;
-  return resolved;
-}
-
-// GET /api/supervisor/rules — rules/ 내 .md 파일 목록
-router.get('/rules', (_req: Request, res: Response) => {
-  const rulesDir = getRulesDir();
-  const files = scanMdFiles(rulesDir, rulesDir);
-  res.json({
-    files: files.map(f => ({
-      filename: f.replace(/\//g, '--'),
-      path: f,
-    })),
-  });
-});
-
-// GET /api/supervisor/rules/:filename — 규칙 파일 내용 읽기
-router.get('/rules/:filename', (req: Request, res: Response) => {
-  const fullPath = resolveRulesPath(req.params.filename as string);
-  if (!fullPath) {
-    res.status(400).json({ error: '잘못된 파일 경로입니다.' });
-    return;
-  }
-
-  if (!fs.existsSync(fullPath)) {
-    res.json({ content: '', exists: false });
-    return;
-  }
-
-  try {
-    const content = fs.readFileSync(fullPath, 'utf-8');
-    res.json({ content, exists: true });
-  } catch {
-    res.status(500).json({ error: '파일 읽기 실패' });
-  }
-});
-
-// PUT /api/supervisor/rules/:filename — 규칙 파일 저장 (없으면 생성)
-router.put('/rules/:filename', (req: Request, res: Response) => {
-  const fullPath = resolveRulesPath(req.params.filename as string);
-  if (!fullPath) {
-    res.status(400).json({ error: '잘못된 파일 경로입니다.' });
-    return;
-  }
-
-  const { content } = req.body;
-  if (typeof content !== 'string') {
-    res.status(400).json({ error: 'content(문자열)가 필요합니다.' });
-    return;
-  }
-
-  try {
-    fs.mkdirSync(path.dirname(fullPath), { recursive: true });
     fs.writeFileSync(fullPath, content, 'utf-8');
     res.json({ message: '파일이 저장되었습니다.' });
   } catch {
     res.status(500).json({ error: '파일 저장 실패' });
-  }
-});
-
-// DELETE /api/supervisor/rules/:filename — 규칙 파일 삭제
-router.delete('/rules/:filename', (req: Request, res: Response) => {
-  const fullPath = resolveRulesPath(req.params.filename as string);
-  if (!fullPath) {
-    res.status(400).json({ error: '잘못된 파일 경로입니다.' });
-    return;
-  }
-
-  if (!fs.existsSync(fullPath)) {
-    res.status(404).json({ error: '파일이 존재하지 않습니다.' });
-    return;
-  }
-
-  try {
-    fs.unlinkSync(fullPath);
-    res.json({ message: '파일이 삭제되었습니다.' });
-  } catch {
-    res.status(500).json({ error: '파일 삭제 실패' });
   }
 });
 

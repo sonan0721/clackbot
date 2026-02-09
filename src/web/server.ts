@@ -11,7 +11,6 @@ import consoleRouter from './api/console.js';
 import supervisorRouter from './api/supervisor.js';
 import pluginsRouter from './api/plugins.js';
 import slackRouter from './api/slack.js';
-import skillsRouter from './api/skills.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -53,7 +52,6 @@ export function createWebServer() {
   app.use('/api/supervisor', supervisorRouter);
   app.use('/api/plugins', pluginsRouter);
   app.use('/api/slack', slackRouter);
-  app.use('/api/skills', skillsRouter);
 
   // 정적 파일 서빙 (Vite 빌드 출력)
   const publicDir = path.resolve(__dirname, 'public');

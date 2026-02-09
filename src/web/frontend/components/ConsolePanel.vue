@@ -6,7 +6,7 @@
     </div>
     <div class="console-container">
       <div ref="outputEl" class="console-output">
-        <div v-for="(line, i) in lines" :key="i" :class="['console-line', `console-${line.type}`]">
+        <div v-for="(line, i) in store.state.lines" :key="i" :class="['console-line', `console-${line.type}`]">
           {{ line.text }}
         </div>
       </div>
@@ -28,68 +28,34 @@
 
 <script setup lang="ts">
 import { ref, watch, nextTick, onMounted } from 'vue'
-import { useSSE } from '../composables/useSSE'
 import { api } from '../composables/useApi'
-import type { SSEEvent } from '../types/api'
-
-interface ConsoleLine {
-  type: string
-  text: string
-}
+import { useConsoleStore } from '../stores/consoleStore'
 
 const props = defineProps<{
   title: string
+  storeKey: string
   sseUrl: string
   sendUrl: string
   resetUrl: string
 }>()
 
 const emit = defineEmits<{
-  event: [data: SSEEvent]
+  event: [data: { type: string; data: string }]
 }>()
 
-const lines = ref<ConsoleLine[]>([])
 const inputText = ref('')
 const outputEl = ref<HTMLDivElement>()
-const inputEl = ref<HTMLInputElement>()
 
-const { messages, connect, clear: clearSSE } = useSSE(props.sseUrl)
+const store = useConsoleStore(props.storeKey)
 
-function appendLine(type: string, text: string) {
-  const splitLines = text.split('\n')
-  for (const line of splitLines) {
-    if (!line.trim()) continue
-    lines.value.push({ type, text: line })
-  }
-}
-
-watch(messages, (msgs) => {
-  if (msgs.length === 0) return
-  const latest = msgs[msgs.length - 1]
-
-  emit('event', latest)
-
-  if (latest.type === 'text') {
-    appendLine('text', latest.data)
-  } else if (latest.type === 'tool_call') {
-    try {
-      const tool = JSON.parse(latest.data)
-      appendLine('tool', `도구 호출: ${tool.name}`)
-    } catch {
-      appendLine('tool', latest.data)
-    }
-  } else if (latest.type === 'error') {
-    appendLine('error', latest.data)
-  } else if (latest.type === 'done') {
-    appendLine('system', '완료')
-  }
-
+// 스크롤 감시 — lines가 변경될 때 자동 스크롤
+watch(() => store.state.lines.length, () => {
   nextTick(() => {
     if (outputEl.value) {
       outputEl.value.scrollTop = outputEl.value.scrollHeight
     }
   })
-}, { deep: true })
+})
 
 async function send() {
   const message = inputText.value.trim()
@@ -102,27 +68,38 @@ async function send() {
       body: JSON.stringify({ message }),
     })
   } catch (err) {
-    appendLine('error', `전송 실패: ${err instanceof Error ? err.message : String(err)}`)
+    store.appendLine('error', `전송 실패: ${err instanceof Error ? err.message : String(err)}`)
+  }
+}
+
+/** 외부에서 메시지를 콘솔에 전송 (GuideUploader 등) */
+async function sendMessage(message: string) {
+  try {
+    await api(props.sendUrl, {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    })
+  } catch (err) {
+    store.appendLine('error', `전송 실패: ${err instanceof Error ? err.message : String(err)}`)
   }
 }
 
 async function resetSession() {
   try {
     await api(props.resetUrl, { method: 'POST' })
-    lines.value = [{ type: 'system', text: '세션이 초기화되었습니다.' }]
-    clearSSE()
+    store.reset()
   } catch {
     // 무시
   }
 }
 
 function addSystemLine(text: string) {
-  appendLine('system', text)
+  store.appendLine('system', text)
 }
 
 onMounted(() => {
-  connect()
+  store.connect(props.sseUrl)
 })
 
-defineExpose({ addSystemLine })
+defineExpose({ addSystemLine, sendMessage })
 </script>

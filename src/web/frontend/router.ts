@@ -23,12 +23,7 @@ const router = createRouter({
       name: 'supervisor',
       component: () => import('./views/SupervisorView.vue'),
     },
-    {
-      path: '/skills',
-      name: 'skills',
-      component: () => import('./views/SkillsView.vue'),
-    },
-    {
+{
       path: '/settings',
       name: 'settings',
       component: () => import('./views/SettingsView.vue'),

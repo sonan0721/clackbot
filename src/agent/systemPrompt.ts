@@ -1,8 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadConfig } from '../config/index.js';
-import { loadSkills } from '../skills/loader.js';
-
 // 시스템 프롬프트 생성 — CLAUDE.md + rules.md + 성격 preset
 
 // MBTI 성격 프리셋 정의 (16유형)
@@ -216,13 +214,6 @@ ${personalityPrompt}`);
     if (content) {
       parts.push(`\n---\n# 규칙 (${relativePath})\n${content}`);
     }
-  }
-
-  // 스킬 목록 추가
-  const skills = loadSkills(cwd);
-  if (skills.length > 0) {
-    const skillList = skills.map(s => `- ${s.slug}: ${s.name}${s.description ? ` — ${s.description}` : ''}`).join('\n');
-    parts.push(`\n---\n# 사용 가능한 스킬\n사용자가 특정 작업을 요청하면 해당 스킬의 지시를 따르세요:\n${skillList}\n\n스킬 상세 지시:\n${skills.map(s => `## [${s.slug}] ${s.name}\n${s.prompt}`).join('\n\n')}`);
   }
 
   // 메모리 읽기 (.clackbot/memory.md)
