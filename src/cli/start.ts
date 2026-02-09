@@ -64,6 +64,13 @@ async function checkForUpdates(branch: string): Promise<void> {
       return;
     }
 
+    // 업데이트 전 버전 읽기
+    let oldVersion = '?';
+    try {
+      const pkg = JSON.parse(fs.readFileSync(path.join(installDir, 'package.json'), 'utf-8'));
+      oldVersion = pkg.version || '?';
+    } catch { /* 무시 */ }
+
     // 새 커밋 수 표시
     const count = execFileSync(
       'git',
@@ -112,7 +119,14 @@ async function checkForUpdates(branch: string): Promise<void> {
       ...shellOpt,
     });
 
-    logger.success('업데이트 완료! 변경사항을 적용하려면 clackbot start를 다시 실행하세요.');
+    // 업데이트 후 버전 읽기
+    let newVersion = '?';
+    try {
+      const pkg = JSON.parse(fs.readFileSync(path.join(installDir, 'package.json'), 'utf-8'));
+      newVersion = pkg.version || '?';
+    } catch { /* 무시 */ }
+
+    logger.success(`업데이트 완료! (v${oldVersion} → v${newVersion}) 변경사항을 적용하려면 clackbot start를 다시 실행하세요.`);
     process.exit(0);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

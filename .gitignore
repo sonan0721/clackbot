@@ -141,3 +141,8 @@ vite.config.ts.timestamp-*
 # Clackbot 로컬 데이터
 .clackbot/
 *.db
+*.db-journal
+*.db-wal
+
+# Claude Code 세션
+.claude/

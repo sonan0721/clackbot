@@ -115,11 +115,10 @@ ${Object.keys(config.mcpServers).length > 0
 
   /** 에이전트 응답에서 JSON 액션을 찾아 config에 반영 */
   private tryParseAction(text: string): void {
-    // JSON 블록 추출 (```json ... ``` 또는 { ... })
-    const jsonMatches = text.match(/\{[^{}]*"action"\s*:\s*"(?:install|remove|install-plugin)"[^{}]*\}/g);
-    if (!jsonMatches) return;
+    const jsonBlocks = this.extractJsonBlocks(text);
+    if (jsonBlocks.length === 0) return;
 
-    for (const match of jsonMatches) {
+    for (const match of jsonBlocks) {
       try {
         const action = JSON.parse(match);
         const config = loadConfig();
@@ -153,6 +152,41 @@ ${Object.keys(config.mcpServers).length > 0
         // JSON 파싱 실패 시 무시
       }
     }
+  }
+
+  /** 텍스트에서 중첩 가능한 JSON 블록 추출 (brace counting) */
+  private extractJsonBlocks(text: string): string[] {
+    const results: string[] = [];
+    let i = 0;
+    while (i < text.length) {
+      if (text[i] === '{') {
+        let depth = 0;
+        let start = i;
+        let inString = false;
+        let escape = false;
+        for (let j = i; j < text.length; j++) {
+          const ch = text[j];
+          if (escape) { escape = false; continue; }
+          if (ch === '\\' && inString) { escape = true; continue; }
+          if (ch === '"') { inString = !inString; continue; }
+          if (inString) continue;
+          if (ch === '{') depth++;
+          if (ch === '}') depth--;
+          if (depth === 0) {
+            const candidate = text.slice(start, j + 1);
+            if (/"action"\s*:\s*"(?:install|remove|install-plugin)"/.test(candidate)) {
+              results.push(candidate);
+            }
+            i = j + 1;
+            break;
+          }
+        }
+        if (depth !== 0) break; // 닫히지 않은 JSON
+      } else {
+        i++;
+      }
+    }
+    return results;
   }
 
   /** 세션 리셋 */
