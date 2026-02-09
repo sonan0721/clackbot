@@ -33,7 +33,7 @@ export function createWebServer() {
   // 버전 읽기
   let appVersion = '?';
   try {
-    const pkgPath = new NodeURL('../../package.json', import.meta.url);
+    const pkgPath = new NodeURL('../../../package.json', import.meta.url);
     const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
     appVersion = pkg.version || '?';
   } catch { /* 무시 */ }

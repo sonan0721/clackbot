@@ -183,7 +183,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
   // 버전 표시
   let version = '?';
   try {
-    const pkgPath = new URL('../../package.json', import.meta.url);
+    const pkgPath = new URL('../../../package.json', import.meta.url);
     const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
     version = pkg.version || '?';
   } catch { /* 무시 */ }
