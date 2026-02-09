@@ -47,6 +47,12 @@ function ensureDefaultFiles(localDir: string): void {
     fs.mkdirSync(rulesDir, { recursive: true });
   }
 
+  // .claude/skills/ 디렉토리
+  const skillsDir = path.join(localDir, '..', '.claude', 'skills');
+  if (!fs.existsSync(skillsDir)) {
+    fs.mkdirSync(skillsDir, { recursive: true });
+  }
+
 }
 
 // 자동 업데이트 확인 — git clone 설치 환경에서만 동작
@@ -282,6 +288,52 @@ export async function startCommand(options: StartOptions): Promise<void> {
     }
     logger.blank();
     logger.info('종료하려면 Ctrl+C를 누르세요.');
+
+    // Owner에게 시작 알림 DM 전송
+    if (config.ownerUserId) {
+      try {
+        const dmOpen = await app.client.conversations.open({ users: config.ownerUserId });
+        if (dmOpen.ok && dmOpen.channel?.id) {
+          const port = parseInt(options.port || String(config.webPort), 10);
+          const webInfo = enableWeb ? `http://localhost:${port}` : '비활성';
+
+          // MCP 서버 목록
+          const mcpNames = Object.keys(config.mcpServers || {});
+          const mcpInfo = mcpNames.length > 0
+            ? mcpNames.join(', ')
+            : '없음';
+
+          const startupMsg = [
+            `:white_check_mark: *Clackbot v${APP_VERSION} 시작됨*`,
+            '',
+            '*현재 설정*',
+            `• 접근 모드: \`${config.accessMode}\``,
+            `• 성격 프리셋: \`${config.personality?.preset ?? 'istj'}\``,
+            `• 세션: 최대 ${config.session?.maxMessages ?? 50}개 메시지 / ${config.session?.timeoutMinutes ?? 30}분 타임아웃`,
+            `• 대시보드: ${webInfo}`,
+            `• MCP 서버: ${mcpInfo}`,
+            '',
+            '*DM으로 할 수 있는 것들*',
+            '• 설정 변경 — "접근 모드를 public으로 바꿔줘", "성격을 enfp로 바꿔줘"',
+            '• MCP 서버 관리 — "Trello MCP 서버 설치해줘", "MCP 서버 목록 보여줘"',
+            '• 규칙 편집 — "CLAUDE.md 보여줘", "응답 규칙에 이모지 금지 추가해줘"',
+            '• 스킬 관리 — "새 스킬 만들어줘", "스킬 목록 보여줘"',
+            '• 파일/이미지 공유 — 파일을 첨부하면 내용을 확인할 수 있어요',
+            '• 채널에 메시지 전송 — "general 채널에 회의 안내 보내줘"',
+            '',
+            '무엇이든 DM으로 요청하세요.',
+          ].join('\n');
+
+          await app.client.chat.postMessage({
+            channel: dmOpen.channel.id,
+            text: startupMsg,
+          });
+          logger.success('Owner에게 시작 알림 DM 전송됨');
+        }
+      } catch (err) {
+        logger.warn(`Owner DM 전송 실패: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
 
     // Graceful shutdown
     const shutdown = async () => {

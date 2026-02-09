@@ -67,6 +67,16 @@ export function getPluginsDir(cwd?: string): string {
   return path.join(getLocalDir(cwd), 'plugins');
 }
 
+/** 프로젝트 루트 디렉토리 (.clackbot의 상위) */
+export function getProjectRoot(cwd?: string): string {
+  return path.resolve(getLocalDir(cwd), '..');
+}
+
+/** Claude Code 스킬 디렉토리 */
+export function getSkillsDir(cwd?: string): string {
+  return path.join(getProjectRoot(cwd), '.claude', 'skills');
+}
+
 /** .env 파일 경로 */
 export function getEnvPath(cwd: string = process.cwd()): string {
   return path.join(cwd, '.env');

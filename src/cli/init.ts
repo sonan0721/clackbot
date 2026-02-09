@@ -44,7 +44,7 @@ export async function initCommand(): Promise<void> {
       const defaultConfig = {
         slack: {},
         accessMode: 'owner',
-        session: { maxMessages: 20, timeoutMinutes: 30 },
+        session: { maxMessages: 50, timeoutMinutes: 30 },
         webPort: 3847,
         projects: [],
       };

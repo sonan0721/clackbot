@@ -1,0 +1,19 @@
+---
+name: example-skill
+description: 예제 스킬 — 이 파일을 참고하여 새 스킬을 만드세요
+user-invocable: true
+disable-model-invocation: false
+allowed-tools: Read, Grep
+---
+
+# 예제 스킬
+
+이 스킬은 사용자가 "/example-skill"을 입력하면 실행됩니다.
+
+## 동작
+1. 현재 디렉토리의 파일 구조를 확인합니다
+2. 주요 파일의 내용을 요약합니다
+
+## 규칙
+- 항상 한국어로 응답하세요
+- 결과를 불릿 포인트로 정리하세요

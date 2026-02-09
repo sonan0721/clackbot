@@ -20,7 +20,7 @@ export const ConfigSchema = z.object({
 
   // 세션 설정
   session: z.object({
-    maxMessages: z.number().int().min(1).max(1000).default(20),
+    maxMessages: z.number().int().min(1).max(1000).default(50),
     timeoutMinutes: z.number().int().min(1).max(1440).default(30),
   }).default({}),
 

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadConfig } from '../config/index.js';
+import { loadConfig, type ClackbotConfig } from '../config/index.js';
+import { getSkillsDir } from '../config/paths.js';
 // 시스템 프롬프트 생성 — CLAUDE.md + rules.md + 성격 preset
 
 // MBTI 성격 프리셋 정의 (16유형)
@@ -174,6 +175,132 @@ const PERSONALITY_PRESETS: Record<string, string> = {
 - 한국어로 답변하세요`,
 };
 
+// ─── 동적 상태 스캔 헬퍼 ───
+
+/** config.mcpServers에서 설치된 MCP 서버 이름/커맨드 목록 */
+function listMcpServers(config: ClackbotConfig): string {
+  const servers = config.mcpServers || {};
+  const names = Object.keys(servers);
+  if (names.length === 0) return '없음';
+  return names
+    .map((name) => {
+      const s = servers[name];
+      return `\`${name}\` (${s.command} ${s.args.join(' ')})`;
+    })
+    .join(', ');
+}
+
+/** rules/ 디렉토리의 .md 파일 목록 */
+function listRuleFiles(cwd: string): string {
+  const rulesDir = path.join(cwd, 'rules');
+  const files = scanMdFiles(rulesDir);
+  if (files.length === 0) return '없음';
+  return files.map((f) => `\`${path.relative(cwd, f)}\``).join(', ');
+}
+
+/** .claude/skills/{name}/SKILL.md 스캔, 이름/설명 추출 */
+function listSkills(projectRoot: string): string {
+  const skillsDir = path.join(projectRoot, '.claude', 'skills');
+  if (!fs.existsSync(skillsDir)) return '없음';
+
+  const entries: string[] = [];
+  try {
+    const dirs = fs.readdirSync(skillsDir, { withFileTypes: true });
+    for (const dir of dirs) {
+      if (!dir.isDirectory()) continue;
+      const skillMd = path.join(skillsDir, dir.name, 'SKILL.md');
+      if (!fs.existsSync(skillMd)) continue;
+
+      const content = fs.readFileSync(skillMd, 'utf-8');
+      // frontmatter에서 name, description 추출
+      const nameMatch = content.match(/^name:\s*(.+)$/m);
+      const descMatch = content.match(/^description:\s*(.+)$/m);
+      const name = nameMatch?.[1]?.trim() ?? dir.name;
+      const desc = descMatch?.[1]?.trim() ?? '';
+      entries.push(desc ? `\`${name}\` — ${desc}` : `\`${name}\``);
+    }
+  } catch {
+    // 읽기 실패 시 무시
+  }
+
+  return entries.length > 0 ? entries.join('\n  ') : '없음';
+}
+
+/** DM 감독 모드 프롬프트 섹션 생성 */
+function buildDmSection(cwd: string, projectRoot: string, config: ClackbotConfig): string {
+  const configPath = path.join(cwd, 'config.json');
+  const skillsPath = path.join(projectRoot, '.claude', 'skills');
+
+  return `\n## DM 감독 모드
+
+Owner가 DM을 통해 직접 감독하고 있습니다.
+
+### 현재 상태
+- MCP 서버: ${listMcpServers(config)}
+- 규칙 파일: ${listRuleFiles(cwd)}
+- Claude Code 스킬: ${listSkills(projectRoot)}
+
+### MCP 서버 관리
+설치 절차:
+1. WebSearch로 해당 MCP 서버의 패키지명, 설치 방법, 필요한 환경변수 조사
+2. 사용자에게 필요한 API 키/토큰 질문
+3. config.json을 Read로 읽고, mcpServers에 새 항목 추가하여 Write로 저장
+
+제거: config.json에서 해당 서버 항목 제거 (Read → Write)
+※ 새 MCP 서버는 봇 재시작 후(다음 메시지부터) 사용 가능
+
+config.json 경로: ${configPath}
+mcpServers 형식:
+\`\`\`json
+{
+  "mcpServers": {
+    "이름": { "command": "npx", "args": ["-y", "패키지명"], "env": { "API_KEY": "..." } }
+  }
+}
+\`\`\`
+
+### 규칙 관리
+- 생성: rules/ 디렉토리에 .md 파일 생성 (Write 도구)
+- 수정: Read로 읽고 Edit/Write로 수정
+- 삭제: Bash로 rm
+- CLAUDE.md 직접 수정 가능
+- 경로: ${cwd}/rules/, ${cwd}/CLAUDE.md
+
+### Claude Code 스킬 관리
+경로: ${skillsPath}/
+
+생성 절차 (대화형 — 아래 순서로 사용자에게 질문):
+1. 스킬 이름 (kebab-case, 예: check-pr)
+2. 스킬 설명 (한 줄)
+3. 어떤 동작을 하는 스킬인지
+4. 호출 방식: 사용자 수동(\`user-invocable: true\`) / Claude 자동(\`disable-model-invocation: false\`) / 둘 다
+5. 필요한 도구 (Read, Write, Edit, Bash, Grep 등)
+6. Bash로 디렉토리 생성: \`mkdir -p ${skillsPath}/{name}\`
+7. Write로 SKILL.md 생성
+
+SKILL.md 템플릿:
+\`\`\`
+---
+name: {name}
+description: {description}
+user-invocable: true
+disable-model-invocation: false
+allowed-tools: Read, Grep
+---
+
+{스킬 동작 지시문}
+\`\`\`
+
+수정: Read로 읽고 Edit/Write로 수정
+삭제: Bash로 \`rm -rf ${skillsPath}/{name}\`
+
+글로벌 규칙:
+- 사용자에게 config.json을 직접 편집하라고 안내하지 마세요 — 대신 직접 수정하세요
+- MCP 서버 설치가 필요하면 Bash 도구로 직접 처리하세요
+- 공유된 파일/이미지를 Read 도구로 확인 가능
+- DM에서 Owner에게 먼저 메시지를 보낼 수 있습니다 (slack_send_dm 도구)`;
+}
+
 /**
  * 프로젝트 디렉토리에서 규칙 파일들을 읽어 시스템 프롬프트 구성
  * 우선순위: CLAUDE.md > rules.md > .clackbot/rules.md
@@ -200,23 +327,21 @@ ${personalityPrompt}`);
 
   // 컨텍스트별 규칙
   if (context === 'dm') {
-    parts.push(`\n## DM 감독 모드
-Owner가 DM을 통해 직접 감독하고 있습니다.
-- CLAUDE.md / rules/ 파일 수정 가능 (Write/Edit 도구 사용)
-- MCP 서버 설치/제거 가능 (Bash 도구로 npm 실행, config.json 수정)
-- 설정 변경 가능 (config.json 직접 수정)
-- 공유된 파일/이미지를 Read 도구로 확인 가능
-- DM에서 Owner에게 먼저 메시지를 보낼 수 있습니다 (slack_send_dm 도구)
-
-글로벌 규칙:
-- 사용자에게 config.json을 직접 편집하라고 안내하지 마세요 — 대신 직접 수정하세요
-- MCP 서버 설치가 필요하면 Bash 도구로 직접 처리하세요`);
+    const projectRoot = path.resolve(cwd, '..');
+    parts.push(buildDmSection(cwd, projectRoot, config));
   } else {
     parts.push(`\n글로벌 규칙:
 - 사용자에게 config.json이나 설정 파일을 직접 편집하라고 안내하지 마세요
 - MCP 서버 설치/설정이 필요하면 Owner에게 DM으로 요청하라고 안내하세요
 - 환경변수나 API 키 설정이 필요하면 Owner DM을 통해 처리하도록 안내하세요`);
   }
+
+  // 보안 규칙 — 모든 컨텍스트 공통
+  parts.push(`\n## 보안 규칙 (절대 위반 금지)
+- 대시보드 URL, 포트 번호, 서버 주소 등 인프라 정보는 **Owner DM에서만** 공유하세요. 채널이나 비Owner에게 절대 노출하지 마세요.
+- 봇의 설정 정보(config, API 키, 토큰, 환경변수)는 Owner DM에서만 공유하세요.
+- slack_send_dm 도구는 Owner에게만 전송할 수 있습니다. 비Owner에게 DM을 보내지 마세요.
+- 비Owner에게 봇의 내부 구조, 설정, 관리 방법을 알려주지 마세요.`);
 
   // cwd는 .clackbot/ 디렉토리
   // CLAUDE.md 읽기 (.clackbot/CLAUDE.md)

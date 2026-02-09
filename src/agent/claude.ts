@@ -6,6 +6,37 @@ import { logger } from '../utils/logger.js';
 
 // Claude Agent SDK query() 래퍼
 
+/** 도구 사용을 사람이 읽기 쉬운 한 줄로 포맷 */
+function formatToolActivity(name: string, input?: Record<string, unknown>): string {
+  // 잘 알려진 도구명 → 한글 설명
+  const toolDescriptions: Record<string, (input?: Record<string, unknown>) => string> = {
+    Read: (i) => `📖 파일 읽는 중${i?.file_path ? `: ${basename(String(i.file_path))}` : ''}`,
+    Write: (i) => `✏️ 파일 작성 중${i?.file_path ? `: ${basename(String(i.file_path))}` : ''}`,
+    Edit: (i) => `✏️ 파일 수정 중${i?.file_path ? `: ${basename(String(i.file_path))}` : ''}`,
+    Bash: (i) => `⚡ 명령어 실행 중${i?.command ? `: ${String(i.command).slice(0, 50)}` : ''}`,
+    Grep: (i) => `🔍 검색 중${i?.pattern ? `: ${String(i.pattern).slice(0, 40)}` : ''}`,
+    Glob: (i) => `🔍 파일 탐색 중${i?.pattern ? `: ${String(i.pattern).slice(0, 40)}` : ''}`,
+    WebSearch: (i) => `🌐 웹 검색 중${i?.query ? `: ${String(i.query).slice(0, 40)}` : ''}`,
+    WebFetch: () => '🌐 웹 페이지 확인 중',
+    slack_post: (i) => `💬 Slack 메시지 전송 중${i?.channel ? ` → #${String(i.channel)}` : ''}`,
+    slack_send_dm: () => '💬 DM 전송 중',
+    slack_read_channel: (i) => `📨 채널 읽는 중${i?.channel ? `: #${String(i.channel)}` : ''}`,
+    memory_read: () => '🧠 메모리 확인 중',
+    memory_write: () => '🧠 메모리 저장 중',
+  };
+
+  const formatter = toolDescriptions[name];
+  if (formatter) return formatter(input);
+
+  // MCP 도구 등 알 수 없는 도구
+  return `🔧 ${name} 도구 사용 중`;
+}
+
+/** 파일 경로에서 파일명만 추출 */
+function basename(filePath: string): string {
+  return filePath.split('/').pop() || filePath;
+}
+
 export interface Attachment {
   name: string;
   path: string;
@@ -21,6 +52,8 @@ export interface QueryParams {
   isOwner: boolean;
   attachments?: Attachment[];
   context?: 'dm' | 'mention';
+  /** 스트리밍 중 진행 상태 콜백 (도구 사용, 텍스트 생성 등) */
+  onProgress?: (status: string) => void;
 }
 
 export interface QueryResult {
@@ -33,7 +66,7 @@ export interface QueryResult {
  * Claude Agent SDK를 사용하여 응답 생성
  */
 export async function queryAgent(params: QueryParams): Promise<QueryResult> {
-  const { prompt, cwd, threadMessages, resumeId, isOwner, attachments, context = 'mention' } = params;
+  const { prompt, cwd, threadMessages, resumeId, isOwner, attachments, context = 'mention', onProgress } = params;
 
   // 스레드 컨텍스트를 프롬프트에 포함
   let fullPrompt = prompt;
@@ -82,6 +115,15 @@ export async function queryAgent(params: QueryParams): Promise<QueryResult> {
       },
     });
 
+    // 진행 상태 추적 (최근 활동 기록)
+    const activities: string[] = [];
+    const pushActivity = (line: string) => {
+      activities.push(line);
+      // 최근 5개만 유지
+      if (activities.length > 5) activities.shift();
+      onProgress?.(activities.join('\n'));
+    };
+
     for await (const message of q) {
       // 결과 메시지에서 최종 텍스트 추출
       if (message.type === 'result') {
@@ -94,7 +136,7 @@ export async function queryAgent(params: QueryParams): Promise<QueryResult> {
       // assistant 메시지에서 텍스트 블록 추출
       if (message.type === 'assistant') {
         const assistantMsg = message as SDKMessage & {
-          message?: { content?: Array<{ type: string; text?: string; name?: string }> };
+          message?: { content?: Array<{ type: string; text?: string; name?: string; input?: Record<string, unknown> }> };
           session_id?: string;
         };
 
@@ -103,16 +145,24 @@ export async function queryAgent(params: QueryParams): Promise<QueryResult> {
           newResumeId = (message as SDKMessage & { session_id?: string }).session_id;
         }
 
-        // 텍스트 수집
+        // 텍스트 수집 + 진행 상태 보고
         if (assistantMsg.message?.content) {
           for (const block of assistantMsg.message.content) {
             if (block.type === 'text' && block.text) {
               if (!responseText) responseText = '';
               responseText += block.text;
+              // 텍스트의 첫 줄을 활동으로 기록 (80자 제한)
+              const firstLine = block.text.split('\n')[0].trim();
+              if (firstLine) {
+                const truncated = firstLine.length > 80 ? firstLine.slice(0, 77) + '...' : firstLine;
+                pushActivity(`💬 ${truncated}`);
+              }
             }
-            // 도구 사용 추적
+            // 도구 사용 추적 + 진행 상태 보고
             if (block.type === 'tool_use' && block.name) {
               toolsUsed.push(block.name);
+              const toolLabel = formatToolActivity(block.name, block.input);
+              pushActivity(toolLabel);
             }
           }
         }
