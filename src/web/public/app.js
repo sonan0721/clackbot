@@ -74,6 +74,10 @@ async function loadStatus() {
   try {
     const status = await api('/api/status');
     const badge = document.getElementById('bot-status');
+    const versionEl = document.getElementById('app-version');
+    if (versionEl && status.version) {
+      versionEl.textContent = `v${status.version}`;
+    }
     if (status.online) {
       badge.textContent = status.botName ? `@${status.botName}` : '온라인';
       badge.className = 'status-badge online';

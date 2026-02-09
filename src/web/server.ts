@@ -1,7 +1,7 @@
 import express from 'express';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, URL as NodeURL } from 'node:url';
 import { loadConfig } from '../config/index.js';
 import { logger } from '../utils/logger.js';
 import toolsRouter from './api/tools.js';
@@ -30,11 +30,20 @@ export function createWebServer() {
     next();
   });
 
+  // 버전 읽기
+  let appVersion = '?';
+  try {
+    const pkgPath = new NodeURL('../../package.json', import.meta.url);
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+    appVersion = pkg.version || '?';
+  } catch { /* 무시 */ }
+
   // API 라우트
   app.get('/api/status', (_req, res) => {
     const config = loadConfig();
     res.json({
       online: true,
+      version: appVersion,
       botName: config.slack.botName || null,
       botUserId: config.slack.botUserId || null,
       teamName: config.slack.teamName || null,
