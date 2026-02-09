@@ -28,12 +28,18 @@ export class PluginInstaller extends EventEmitter {
 1. 사용자의 요청을 파악합니다
 2. npm에서 관련 MCP 서버 패키지를 검색합니다 (키워드: @modelcontextprotocol, mcp-server)
 3. 적절한 패키지를 찾으면 사용자에게 설치 확인을 요청합니다
-4. 사용자가 승인하면 npx로 실행 가능한 명령어를 구성합니다
-5. 필요한 환경변수(API 키 등)가 있으면 사용자에게 안내합니다
+4. 필요한 환경변수가 있으면 사용자에게 직접 값을 입력받습니다
+   - 각 환경변수의 용도를 설명하고 값을 요청하세요
+   - 키가 없으면 발급 방법/URL을 안내한 후 "준비되면 입력해주세요"라고 말하세요
+   - 모든 필수 환경변수를 수집한 후에만 설치 액션을 실행하세요
+5. 모든 정보가 수집되면 JSON 액션을 출력합니다
 
 현재 설치된 MCP 서버:
 ${Object.keys(config.mcpServers).length > 0
-  ? Object.entries(config.mcpServers).map(([name, s]) => `- ${name}: ${s.command} ${s.args.join(' ')}`).join('\n')
+  ? Object.entries(config.mcpServers).map(([name, s]) => {
+      const envKeys = s.env ? Object.keys(s.env).join(', ') : '';
+      return `- ${name}: ${s.command} ${s.args.join(' ')}${envKeys ? ` (env: ${envKeys})` : ''}`;
+    }).join('\n')
   : '(없음)'}
 
 플러그인 시스템:
@@ -43,10 +49,17 @@ ${Object.keys(config.mcpServers).length > 0
 
 중요:
 - 한국어로 답변하세요
-- MCP 서버 설치: {"action":"install","name":"서버이름","command":"npx","args":["-y","패키지명"],"env":{"KEY":"설명"}}
+- MCP 서버 설치: {"action":"install","name":"서버이름","command":"npx","args":["-y","패키지명"],"env":{"KEY":"실제값"}}
 - MCP 서버 삭제: {"action":"remove","name":"서버이름"}
+- MCP 서버 설정 업데이트: {"action":"configure","name":"서버이름","env":{"KEY":"실제값"}}
 - 통합 플러그인 설치: {"action":"install-plugin","name":"플러그인이름","manifest":{...},"pageJs":"코드"}
-- 검색만 할 때는 일반 텍스트로 답변하세요`;
+- 검색만 할 때는 일반 텍스트로 답변하세요
+
+절대 금지:
+- config.json을 직접 편집하라고 안내하지 마세요
+- 환경변수 값에 설명 텍스트나 플레이스홀더를 넣지 마세요 (예: "your-api-key" 금지)
+- env의 값은 반드시 사용자가 입력한 실제 값이어야 합니다
+- 모든 설정은 이 대화를 통해 처리합니다`;
 
     try {
       const q = query({
@@ -97,9 +110,10 @@ ${Object.keys(config.mcpServers).length > 0
         }
 
         if (msg.type === 'result') {
+          // result 텍스트는 assistant 메시지와 중복이므로 emit하지 않음
+          // 단, JSON 액션 파싱은 수행
           const resultMsg = msg as SDKMessage & { subtype?: string; result?: string };
           if (resultMsg.subtype === 'success' && resultMsg.result) {
-            this.emit('event', { type: 'text', data: resultMsg.result } as InstallerEvent);
             this.tryParseAction(resultMsg.result);
           }
         }
@@ -139,6 +153,17 @@ ${Object.keys(config.mcpServers).length > 0
           logger.info(`MCP 서버 제거됨: ${action.name}`);
         }
 
+        if (action.action === 'configure' && action.name && action.env) {
+          if (config.mcpServers[action.name]) {
+            config.mcpServers[action.name].env = {
+              ...config.mcpServers[action.name].env,
+              ...action.env,
+            };
+            saveConfig(config);
+            logger.info(`MCP 서버 설정 업데이트: ${action.name}`);
+          }
+        }
+
         if (action.action === 'install-plugin' && action.name && action.manifest) {
           const pluginDir = path.join(getPluginsDir(), action.name);
           fs.mkdirSync(pluginDir, { recursive: true });
@@ -174,7 +199,7 @@ ${Object.keys(config.mcpServers).length > 0
           if (ch === '}') depth--;
           if (depth === 0) {
             const candidate = text.slice(start, j + 1);
-            if (/"action"\s*:\s*"(?:install|remove|install-plugin)"/.test(candidate)) {
+            if (/"action"\s*:\s*"(?:install|remove|install-plugin|configure)"/.test(candidate)) {
               results.push(candidate);
             }
             i = j + 1;

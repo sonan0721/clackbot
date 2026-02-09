@@ -198,6 +198,11 @@ export function buildSystemPrompt(cwd: string): string {
 
 ${personalityPrompt}`);
 
+  parts.push(`\n글로벌 규칙:
+- 사용자에게 config.json이나 설정 파일을 직접 편집하라고 안내하지 마세요
+- MCP 서버 설치/설정은 대시보드의 "연동 툴" 페이지 콘솔을 통해 안내하세요
+- 환경변수나 API 키 설정이 필요하면 대시보드 콘솔에서 대화로 처리하도록 안내하세요`);
+
   // cwd는 .clackbot/ 디렉토리
   // CLAUDE.md 읽기 (.clackbot/CLAUDE.md)
   const claudeMd = tryReadFile(path.join(cwd, 'CLAUDE.md'));

@@ -50,7 +50,9 @@ export class Supervisor extends EventEmitter {
 중요:
 - 한국어로 답변하세요
 - 파일 편집 시 신중하게 작업하세요
-- 규칙 파일 변경 시 변경 내용을 설명하세요`;
+- 규칙 파일 변경 시 변경 내용을 설명하세요
+- 사용자에게 config.json을 직접 편집하라고 안내하지 마세요
+- MCP 서버 설정은 대시보드 콘솔의 설치 전문가를 통해 안내하세요`;
 
     try {
       const mcpServers = getMcpServers(cwd);
@@ -133,10 +135,7 @@ export class Supervisor extends EventEmitter {
         }
 
         if (msg.type === 'result') {
-          const resultMsg = msg as SDKMessage & { subtype?: string; result?: string };
-          if (resultMsg.subtype === 'success' && resultMsg.result) {
-            this.emit('event', { type: 'text', data: resultMsg.result } as SupervisorEvent);
-          }
+          // result 텍스트는 assistant 메시지와 중복이므로 emit하지 않음
         }
       }
 
