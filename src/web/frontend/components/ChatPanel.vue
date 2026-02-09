@@ -82,14 +82,14 @@
             </div>
           </div>
           <div class="chat-input-bar">
-            <input
+            <textarea
               v-model="inputText"
-              type="text"
               class="chat-input-field"
-              placeholder="메시지를 입력하세요..."
-              :disabled="waiting"
+              placeholder="메시지를 입력하세요... (Shift+Enter: 줄바꿈)"
+              rows="1"
               @keydown.enter="onEnter"
-            />
+              @input="autoResize"
+            ></textarea>
             <button class="btn btn-primary" style="margin-left: 8px;" :disabled="waiting || !inputText.trim()" @click="sendMessage">전송</button>
           </div>
         </template>
@@ -263,7 +263,15 @@ function flushStreamLines() {
 
 function onEnter(e: KeyboardEvent) {
   if (e.isComposing) return
+  if (e.shiftKey) return // Shift+Enter → 줄바꿈 허용
+  e.preventDefault()
   sendMessage()
+}
+
+function autoResize(e: Event) {
+  const el = e.target as HTMLTextAreaElement
+  el.style.height = 'auto'
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px'
 }
 
 async function sendMessage() {
@@ -486,7 +494,7 @@ onUnmounted(() => {
 
 .chat-input-bar {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   padding: 12px 20px;
   border-top: 1px solid var(--border);
   background: var(--bg-card);
@@ -501,6 +509,10 @@ onUnmounted(() => {
   font-family: inherit;
   outline: none;
   background: var(--bg);
+  resize: none;
+  overflow-y: auto;
+  max-height: 120px;
+  line-height: 1.5;
 }
 
 .chat-input-field:focus {
@@ -508,10 +520,6 @@ onUnmounted(() => {
   box-shadow: 0 0 0 2px rgba(54, 197, 240, 0.2);
 }
 
-.chat-input-field:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
 
 /* ─── thinking 인디케이터 ─── */
 

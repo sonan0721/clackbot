@@ -52,14 +52,14 @@
       </div>
     </div>
     <div class="console-chat-input-bar">
-      <input
+      <textarea
         v-model="inputText"
-        type="text"
         class="console-chat-input"
-        placeholder="메시지 입력..."
-        :disabled="store.state.waiting"
+        placeholder="메시지 입력... (Shift+Enter: 줄바꿈)"
+        rows="1"
         @keydown.enter="onEnter"
-      />
+        @input="autoResize"
+      ></textarea>
       <button class="btn btn-primary" style="margin-left: 8px;" :disabled="!inputText.trim() || store.state.waiting" @click="send">전송</button>
     </div>
   </div>
@@ -101,7 +101,15 @@ function scrollToBottom() {
 
 function onEnter(e: KeyboardEvent) {
   if (e.isComposing) return
+  if (e.shiftKey) return // Shift+Enter → 줄바꿈 허용
+  e.preventDefault()
   send()
+}
+
+function autoResize(e: Event) {
+  const el = e.target as HTMLTextAreaElement
+  el.style.height = 'auto'
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px'
 }
 
 async function send() {
@@ -266,7 +274,7 @@ defineExpose({ addSystemLine, sendMessage })
 
 .console-chat-input-bar {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   padding: 12px 20px;
   border-top: 1px solid var(--border);
   background: var(--bg-card);
@@ -281,6 +289,10 @@ defineExpose({ addSystemLine, sendMessage })
   font-family: inherit;
   outline: none;
   background: var(--bg);
+  resize: none;
+  overflow-y: auto;
+  max-height: 120px;
+  line-height: 1.5;
 }
 
 .console-chat-input:focus {
@@ -288,10 +300,6 @@ defineExpose({ addSystemLine, sendMessage })
   box-shadow: 0 0 0 2px rgba(54, 197, 240, 0.2);
 }
 
-.console-chat-input:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
 
 /* ─── thinking 인디케이터 ─── */
 
