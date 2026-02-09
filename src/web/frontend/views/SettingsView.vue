@@ -3,14 +3,37 @@
     <h1 class="page-title">설정</h1>
 
     <div class="card">
-      <h2>봇 성격</h2>
+      <h2>봇 성격 (MBTI)</h2>
       <div class="form-group" style="margin-top: 16px;">
-        <label>성격 프리셋</label>
-        <select v-model="preset" class="form-control" style="max-width: 300px;">
-          <option value="professional">전문적 (Professional)</option>
-          <option value="friendly">친근한 (Friendly)</option>
-          <option value="detailed">상세한 (Detailed)</option>
-          <option value="custom">커스텀 (Custom)</option>
+        <label>MBTI 프리셋</label>
+        <select v-model="preset" class="form-control" style="max-width: 360px;">
+          <optgroup label="분석가 (Analysts)">
+            <option value="intj">INTJ — 전략가</option>
+            <option value="intp">INTP — 논리술사</option>
+            <option value="entj">ENTJ — 통솔자</option>
+            <option value="entp">ENTP — 변론가</option>
+          </optgroup>
+          <optgroup label="외교관 (Diplomats)">
+            <option value="infj">INFJ — 옹호자</option>
+            <option value="infp">INFP — 중재자</option>
+            <option value="enfj">ENFJ — 선도자</option>
+            <option value="enfp">ENFP — 활동가</option>
+          </optgroup>
+          <optgroup label="관리자 (Sentinels)">
+            <option value="istj">ISTJ — 현실주의자</option>
+            <option value="isfj">ISFJ — 수호자</option>
+            <option value="estj">ESTJ — 관리자</option>
+            <option value="esfj">ESFJ — 외교관</option>
+          </optgroup>
+          <optgroup label="탐험가 (Explorers)">
+            <option value="istp">ISTP — 장인</option>
+            <option value="isfp">ISFP — 모험가</option>
+            <option value="estp">ESTP — 사업가</option>
+            <option value="esfp">ESFP — 연예인</option>
+          </optgroup>
+          <optgroup label="기타">
+            <option value="custom">커스텀 (직접 입력)</option>
+          </optgroup>
         </select>
         <div style="margin-top: 4px; font-size: 12px; color: var(--text-muted);">{{ presetDesc }}</div>
       </div>
@@ -106,7 +129,7 @@ import { ref, computed, onMounted } from 'vue'
 import { api } from '../composables/useApi'
 import type { ConfigResponse, SlackUser } from '../types/api'
 
-const preset = ref<string>('professional')
+const preset = ref<string>('istj')
 const customPrompt = ref('')
 const accessMode = ref('owner')
 const replyMode = ref('thread')
@@ -121,9 +144,27 @@ const usersLoaded = ref(false)
 const usersFailed = ref(false)
 
 const presetDescriptions: Record<string, string> = {
-  professional: '간결하고 명확. 3~5줄. 이모지 없음.',
-  friendly: '친근한 동료 톤. 이모지 적절히 사용. 캐주얼.',
-  detailed: '꼼꼼하고 상세. 5~15줄. 단계별 안내.',
+  // 분석가
+  intj: '논리적, 전략적, 간결. 감정보다 사실 중심. 이모지 없음.',
+  intp: '정밀한 분석, 다각도 관점 제시. 객관적 톤. 이모지 없음.',
+  entj: '단호하고 자신감 있는 리더 톤. 결론 먼저. 이모지 없음.',
+  entp: '창의적, 재치 있는 톤. 아이디어 브레인스토밍. 이모지 가능.',
+  // 외교관
+  infj: '사려 깊고 통찰력 있는 톤. 공감과 본질 파악.',
+  infp: '따뜻하고 공감적. 감정 인정, 격려하는 어조.',
+  enfj: '격려하는 리더 톤. 칭찬과 팀 조화 강조. 이모지 사용.',
+  enfp: '열정적, 밝고 에너지 넘침. 이모지 자주 사용 🎉',
+  // 관리자
+  istj: '사실 기반, 체계적, 정확. 핵심만 전달. 이모지 없음.',
+  isfj: '따뜻하고 세심. 안정감 있는 차분한 어조.',
+  estj: '결단력 있고 체계적. 규칙과 기한 명확. 이모지 없음.',
+  esfj: '사교적, 친근. 팀 화합과 배려 강조. 이모지 적절히 사용.',
+  // 탐험가
+  istp: '실용적, 담백. 문제 해결 직행. 최소 2~4줄. 이모지 없음.',
+  isfp: '부드럽고 배려 있는 톤. 창의적 접근. 이모지 소량.',
+  estp: '직설적, 에너지 넘침. 즉시 실행 가능한 조언.',
+  esfp: '밝고 유쾌. 분위기 메이커. 이모지 자주 사용 ✨',
+  // 기타
   custom: '아래에 직접 프롬프트를 작성하세요.',
 }
 
@@ -132,7 +173,7 @@ const presetDesc = computed(() => presetDescriptions[preset.value] || '')
 onMounted(async () => {
   try {
     const config = await api<ConfigResponse>('/api/config')
-    preset.value = config.personality?.preset || 'professional'
+    preset.value = config.personality?.preset || 'istj'
     customPrompt.value = config.personality?.customPrompt || ''
     accessMode.value = config.accessMode
     replyMode.value = config.replyMode

@@ -71,7 +71,7 @@ export interface ConfigResponse {
     timeoutMinutes: number
   }
   personality: {
-    preset: 'professional' | 'friendly' | 'detailed' | 'custom'
+    preset: string
     customPrompt?: string
   }
   slack: {

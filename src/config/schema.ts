@@ -32,7 +32,13 @@ export const ConfigSchema = z.object({
 
   // 성격 프리셋
   personality: z.object({
-    preset: z.enum(['professional', 'friendly', 'detailed', 'custom']).default('professional'),
+    preset: z.enum([
+      'intj', 'intp', 'entj', 'entp',
+      'infj', 'infp', 'enfj', 'enfp',
+      'istj', 'isfj', 'estj', 'esfj',
+      'istp', 'isfp', 'estp', 'esfp',
+      'custom',
+    ]).default('istj'),
     customPrompt: z.string().optional(),
   }).default({}),
 

@@ -1,10 +1,8 @@
 <template>
-  <div id="app">
-    <AppSidebar />
-    <main class="content">
-      <router-view />
-    </main>
-  </div>
+  <AppSidebar />
+  <main class="content">
+    <router-view />
+  </main>
 </template>
 
 <script setup lang="ts">
