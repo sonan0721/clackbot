@@ -40,6 +40,26 @@ export function initDatabase(cwd?: string): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_conversations_created ON conversations(created_at);
   `);
 
+  // 슈퍼바이저 세션/메시지 테이블
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS supervisor_sessions (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS supervisor_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id TEXT NOT NULL REFERENCES supervisor_sessions(id) ON DELETE CASCADE,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      timestamp TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_sv_messages_session ON supervisor_messages(session_id);
+  `);
+
   logger.debug(`대화 DB 초기화: ${dbPath}`);
   return db;
 }
@@ -259,6 +279,92 @@ export function getSessionMessages(threadTs: string): ConversationListItem[] {
     outputText: row.output_text,
     toolsUsed: row.tools_used ? JSON.parse(row.tools_used) : [],
     createdAt: row.created_at,
+  }));
+}
+
+// ─── 슈퍼바이저 세션/메시지 CRUD ───
+
+export interface SupervisorSessionRecord {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SupervisorMessageRecord {
+  role: 'user' | 'assistant' | 'tool';
+  content: string;
+  timestamp: string;
+}
+
+/** 슈퍼바이저 세션 저장 */
+export function saveSupervisorSession(id: string, title: string): void {
+  const database = initDatabase();
+  const now = new Date().toISOString();
+  database.prepare(
+    'INSERT INTO supervisor_sessions (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)'
+  ).run(id, title, now, now);
+}
+
+/** 슈퍼바이저 세션 업데이트 */
+export function updateSupervisorSession(id: string, updates: { title?: string; updatedAt?: string }): void {
+  const database = initDatabase();
+  const sets: string[] = [];
+  const params: unknown[] = [];
+
+  if (updates.title !== undefined) {
+    sets.push('title = ?');
+    params.push(updates.title);
+  }
+  sets.push('updated_at = ?');
+  params.push(updates.updatedAt ?? new Date().toISOString());
+
+  params.push(id);
+  database.prepare(`UPDATE supervisor_sessions SET ${sets.join(', ')} WHERE id = ?`).run(...params);
+}
+
+/** 슈퍼바이저 세션 삭제 (CASCADE로 메시지도 삭제) */
+export function deleteSupervisorSession(id: string): void {
+  const database = initDatabase();
+  // SQLite FK cascade는 PRAGMA foreign_keys = ON 필요
+  database.pragma('foreign_keys = ON');
+  database.prepare('DELETE FROM supervisor_sessions WHERE id = ?').run(id);
+}
+
+/** 슈퍼바이저 세션 목록 조회 (최신 순) */
+export function getSupervisorSessions(): SupervisorSessionRecord[] {
+  const database = initDatabase();
+  const rows = database.prepare(
+    'SELECT id, title, created_at, updated_at FROM supervisor_sessions ORDER BY updated_at DESC'
+  ).all() as Array<{ id: string; title: string; created_at: string; updated_at: string }>;
+
+  return rows.map(row => ({
+    id: row.id,
+    title: row.title,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
+}
+
+/** 슈퍼바이저 메시지 저장 */
+export function saveSupervisorMessage(sessionId: string, role: string, content: string, timestamp: string): void {
+  const database = initDatabase();
+  database.prepare(
+    'INSERT INTO supervisor_messages (session_id, role, content, timestamp) VALUES (?, ?, ?, ?)'
+  ).run(sessionId, role, content, timestamp);
+}
+
+/** 슈퍼바이저 메시지 조회 */
+export function getSupervisorMessages(sessionId: string): SupervisorMessageRecord[] {
+  const database = initDatabase();
+  const rows = database.prepare(
+    'SELECT role, content, timestamp FROM supervisor_messages WHERE session_id = ? ORDER BY id ASC'
+  ).all(sessionId) as Array<{ role: string; content: string; timestamp: string }>;
+
+  return rows.map(row => ({
+    role: row.role as 'user' | 'assistant' | 'tool',
+    content: row.content,
+    timestamp: row.timestamp,
   }));
 }
 

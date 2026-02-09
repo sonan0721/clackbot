@@ -3,6 +3,15 @@ import path from 'node:path';
 import { Router, type Request, type Response } from 'express';
 import { getLocalDir } from '../../config/paths.js';
 import { Supervisor, type SupervisorEvent } from '../../agent/supervisor.js';
+import {
+  saveSupervisorSession,
+  updateSupervisorSession,
+  deleteSupervisorSession,
+  getSupervisorSessions,
+  saveSupervisorMessage,
+  getSupervisorMessages,
+} from '../../store/conversations.js';
+import { logger } from '../../utils/logger.js';
 
 // SSE + 다중 세션 + 파일 편집 API — 슈퍼바이저
 
@@ -29,16 +38,25 @@ interface SupervisorSession {
 const sessions = new Map<string, SupervisorSession>();
 let sessionCounter = 0;
 
-function createSession(): SupervisorSession {
-  const id = `sv-${++sessionCounter}-${Date.now()}`;
+interface CreateSessionOptions {
+  id?: string;
+  title?: string;
+  messages?: ChatMessage[];
+  createdAt?: string;
+  updatedAt?: string;
+  persistToDb?: boolean;
+}
+
+function createSession(opts: CreateSessionOptions = {}): SupervisorSession {
+  const id = opts.id ?? `sv-${++sessionCounter}-${Date.now()}`;
   const now = new Date().toISOString();
   const session: SupervisorSession = {
     id,
-    title: '새 대화',
-    messages: [],
+    title: opts.title ?? '새 대화',
+    messages: opts.messages ?? [],
     supervisor: new Supervisor(),
-    createdAt: now,
-    updatedAt: now,
+    createdAt: opts.createdAt ?? now,
+    updatedAt: opts.updatedAt ?? now,
     sseClients: new Set(),
   };
 
@@ -46,19 +64,24 @@ function createSession(): SupervisorSession {
   session.supervisor.on('event', (event: SupervisorEvent) => {
     // 메시지 저장
     if (event.type === 'text') {
-      session.messages.push({
+      const msg: ChatMessage = {
         role: 'assistant',
         content: event.data,
         timestamp: new Date().toISOString(),
-      });
+      };
+      session.messages.push(msg);
+      saveSupervisorMessage(session.id, msg.role, msg.content, msg.timestamp);
     } else if (event.type === 'tool_call') {
-      session.messages.push({
+      const msg: ChatMessage = {
         role: 'tool',
         content: event.data,
         timestamp: new Date().toISOString(),
-      });
+      };
+      session.messages.push(msg);
+      saveSupervisorMessage(session.id, msg.role, msg.content, msg.timestamp);
     }
     session.updatedAt = new Date().toISOString();
+    updateSupervisorSession(session.id, { updatedAt: session.updatedAt });
 
     // SSE 브로드캐스트
     const data = JSON.stringify(event);
@@ -72,8 +95,30 @@ function createSession(): SupervisorSession {
     }
   });
 
+  // DB에 세션 저장 (복원 시에는 이미 DB에 있으므로 skip)
+  if (opts.persistToDb !== false) {
+    saveSupervisorSession(id, session.title);
+  }
+
   sessions.set(id, session);
   return session;
+}
+
+/** 서버 시작 시 DB에서 세션 복원 */
+export function initSupervisorSessions(): void {
+  const dbSessions = getSupervisorSessions();
+  for (const s of dbSessions) {
+    const messages = getSupervisorMessages(s.id);
+    createSession({
+      id: s.id,
+      title: s.title,
+      messages,
+      createdAt: s.createdAt,
+      updatedAt: s.updatedAt,
+      persistToDb: false,
+    });
+  }
+  logger.info(`슈퍼바이저 세션 ${dbSessions.length}개 DB에서 복원`);
 }
 
 /** 모든 세션의 모든 클라이언트에 이벤트 전송 */
@@ -121,6 +166,7 @@ router.delete('/sessions/:id', (req: Request, res: Response) => {
     client.end();
   }
   sessions.delete(req.params.id as string);
+  deleteSupervisorSession(req.params.id as string);
   res.json({ status: 'ok' });
 });
 
@@ -165,15 +211,19 @@ router.post('/sessions/:id/send', async (req: Request, res: Response) => {
   // 제목 자동 설정 (첫 메시지)
   if (session.messages.length === 0) {
     session.title = message.slice(0, 50) + (message.length > 50 ? '...' : '');
+    updateSupervisorSession(session.id, { title: session.title });
   }
 
   // 사용자 메시지 저장
-  session.messages.push({
+  const userMsg: ChatMessage = {
     role: 'user',
     content: message,
     timestamp: new Date().toISOString(),
-  });
+  };
+  session.messages.push(userMsg);
   session.updatedAt = new Date().toISOString();
+  saveSupervisorMessage(session.id, userMsg.role, userMsg.content, userMsg.timestamp);
+  updateSupervisorSession(session.id, { updatedAt: session.updatedAt });
 
   // 사용자 입력 SSE echo
   const echoData = JSON.stringify({ type: 'text', data: `\n> ${message}\n` });
