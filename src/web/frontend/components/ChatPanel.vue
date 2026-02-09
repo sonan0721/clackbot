@@ -68,6 +68,18 @@
                 <template v-else>{{ line.content }}</template>
               </div>
             </div>
+            <!-- thinking 인디케이터 -->
+            <div v-if="waiting" class="chat-msg chat-msg-assistant">
+              <div class="chat-msg-role">어시스턴트</div>
+              <div class="chat-msg-content thinking-bubble">
+                <span class="thinking-dots">
+                  <span class="thinking-dot"></span>
+                  <span class="thinking-dot"></span>
+                  <span class="thinking-dot"></span>
+                </span>
+                <span class="thinking-text">생각하는 중...</span>
+              </div>
+            </div>
           </div>
           <div class="chat-input-bar">
             <input
@@ -75,10 +87,10 @@
               type="text"
               class="chat-input-field"
               placeholder="메시지를 입력하세요..."
-              :disabled="sending"
+              :disabled="waiting"
               @keydown.enter="onEnter"
             />
-            <button class="btn btn-primary" style="margin-left: 8px;" :disabled="sending || !inputText.trim()" @click="sendMessage">전송</button>
+            <button class="btn btn-primary" style="margin-left: 8px;" :disabled="waiting || !inputText.trim()" @click="sendMessage">전송</button>
           </div>
         </template>
       </div>
@@ -117,7 +129,7 @@ const activeSessionId = ref('')
 const currentMessages = ref<ChatMessage[]>([])
 const streamLines = ref<StreamLine[]>([])
 const inputText = ref('')
-const sending = ref(false)
+const waiting = ref(false)
 const messagesEl = ref<HTMLDivElement>()
 
 let eventSource: EventSource | null = null
@@ -159,6 +171,7 @@ async function deleteSession(id: string) {
       activeSessionId.value = ''
       currentMessages.value = []
       streamLines.value = []
+      waiting.value = false
     }
     await loadSessions()
   } catch {
@@ -172,6 +185,7 @@ async function switchSession(id: string) {
   disconnectSSE()
   activeSessionId.value = id
   streamLines.value = []
+  waiting.value = false
 
   // 메시지 히스토리 로드
   try {
@@ -196,17 +210,19 @@ function connectSSE(sessionId: string) {
       if (data.type === 'connected') return
 
       if (data.type === 'text') {
-        // `> ` 접두사는 사용자 echo — 무시 (이미 messages에 있음)
         const text = data.data as string
         if (text.trim().startsWith('>')) return
 
+        waiting.value = false
         streamLines.value.push({ role: 'assistant', content: text })
       } else if (data.type === 'tool_call') {
+        waiting.value = false
         streamLines.value.push({ role: 'tool', content: data.data })
       } else if (data.type === 'done') {
-        // 스트림 완료 — streamLines를 currentMessages로 병합
+        waiting.value = false
         flushStreamLines()
       } else if (data.type === 'error') {
+        waiting.value = false
         streamLines.value.push({ role: 'assistant', content: `오류: ${data.data}` })
         flushStreamLines()
       } else if (data.type === 'file_changed') {
@@ -252,12 +268,11 @@ function onEnter(e: KeyboardEvent) {
 
 async function sendMessage() {
   const message = inputText.value.trim()
-  if (!message || sending.value) return
+  if (!message || waiting.value) return
 
   inputText.value = ''
-  sending.value = true
+  waiting.value = true
 
-  // 즉시 UI에 사용자 메시지 표시
   currentMessages.value.push({
     role: 'user',
     content: message,
@@ -270,15 +285,13 @@ async function sendMessage() {
       method: 'POST',
       body: JSON.stringify({ message }),
     })
-    // 세션 목록 갱신 (제목 변경 반영)
     await loadSessions()
   } catch (err) {
+    waiting.value = false
     streamLines.value.push({
       role: 'assistant',
       content: `전송 실패: ${err instanceof Error ? err.message : String(err)}`,
     })
-  } finally {
-    sending.value = false
   }
 }
 
@@ -493,6 +506,58 @@ onUnmounted(() => {
 .chat-input-field:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px rgba(54, 197, 240, 0.2);
+}
+
+.chat-input-field:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ─── thinking 인디케이터 ─── */
+
+.thinking-bubble {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+}
+
+.thinking-dots {
+  display: flex;
+  gap: 4px;
+}
+
+.thinking-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary);
+  opacity: 0.4;
+  animation: thinking-bounce 1.4s ease-in-out infinite;
+}
+
+.thinking-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.thinking-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes thinking-bounce {
+  0%, 80%, 100% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+}
+
+.thinking-text {
+  font-size: 13px;
+  color: var(--text-muted);
 }
 
 @media (max-width: 768px) {

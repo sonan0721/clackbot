@@ -35,7 +35,19 @@
           <div class="console-chat-bubble console-chat-bubble-error">{{ msg.content }}</div>
         </template>
       </div>
-      <div v-if="store.state.messages.length === 0" class="console-chat-empty">
+      <!-- thinking 인디케이터 -->
+      <div v-if="store.state.waiting" class="console-chat-msg console-chat-assistant">
+        <div class="console-chat-role">어시스턴트</div>
+        <div class="console-chat-bubble console-chat-bubble-bot thinking-bubble">
+          <span class="thinking-dots">
+            <span class="thinking-dot"></span>
+            <span class="thinking-dot"></span>
+            <span class="thinking-dot"></span>
+          </span>
+          <span class="thinking-text">생각하는 중...</span>
+        </div>
+      </div>
+      <div v-if="store.state.messages.length === 0 && !store.state.waiting" class="console-chat-empty">
         메시지를 입력하여 대화를 시작하세요
       </div>
     </div>
@@ -45,9 +57,10 @@
         type="text"
         class="console-chat-input"
         placeholder="메시지 입력..."
+        :disabled="store.state.waiting"
         @keydown.enter="onEnter"
       />
-      <button class="btn btn-primary" style="margin-left: 8px;" :disabled="!inputText.trim()" @click="send">전송</button>
+      <button class="btn btn-primary" style="margin-left: 8px;" :disabled="!inputText.trim() || store.state.waiting" @click="send">전송</button>
     </div>
   </div>
 </template>
@@ -71,12 +84,20 @@ const messagesEl = ref<HTMLDivElement>()
 const store = useConsoleStore(props.storeKey)
 
 watch(() => store.state.messages.length, () => {
+  scrollToBottom()
+})
+
+watch(() => store.state.waiting, () => {
+  scrollToBottom()
+})
+
+function scrollToBottom() {
   nextTick(() => {
     if (messagesEl.value) {
       messagesEl.value.scrollTop = messagesEl.value.scrollHeight
     }
   })
-})
+}
 
 function onEnter(e: KeyboardEvent) {
   if (e.isComposing) return
@@ -88,8 +109,8 @@ async function send() {
   if (!message) return
   inputText.value = ''
 
-  // 사용자 메시지 즉시 UI에 추가
   store.addMessage('user', message)
+  store.setWaiting(true)
 
   try {
     await api(props.sendUrl, {
@@ -97,6 +118,7 @@ async function send() {
       body: JSON.stringify({ message }),
     })
   } catch (err) {
+    store.setWaiting(false)
     store.addMessage('error', `전송 실패: ${err instanceof Error ? err.message : String(err)}`)
   }
 }
@@ -104,6 +126,7 @@ async function send() {
 /** 외부에서 메시지를 전송 (GuideUploader 등) */
 async function sendMessage(message: string) {
   store.addMessage('user', message)
+  store.setWaiting(true)
 
   try {
     await api(props.sendUrl, {
@@ -111,6 +134,7 @@ async function sendMessage(message: string) {
       body: JSON.stringify({ message }),
     })
   } catch (err) {
+    store.setWaiting(false)
     store.addMessage('error', `전송 실패: ${err instanceof Error ? err.message : String(err)}`)
   }
 }
@@ -262,5 +286,57 @@ defineExpose({ addSystemLine, sendMessage })
 .console-chat-input:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px rgba(54, 197, 240, 0.2);
+}
+
+.console-chat-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ─── thinking 인디케이터 ─── */
+
+.thinking-bubble {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+}
+
+.thinking-dots {
+  display: flex;
+  gap: 4px;
+}
+
+.thinking-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary);
+  opacity: 0.4;
+  animation: thinking-bounce 1.4s ease-in-out infinite;
+}
+
+.thinking-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.thinking-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes thinking-bounce {
+  0%, 80%, 100% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+}
+
+.thinking-text {
+  font-size: 13px;
+  color: var(--text-muted);
 }
 </style>

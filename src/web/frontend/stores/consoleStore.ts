@@ -12,6 +12,7 @@ interface ConsoleState {
   messages: ChatMsg[]
   eventSource: EventSource | null
   connected: boolean
+  waiting: boolean
 }
 
 // 키별 싱글턴 상태 관리 (tools 등)
@@ -23,6 +24,7 @@ function getOrCreate(key: string): ConsoleState {
       messages: [],
       eventSource: null,
       connected: false,
+      waiting: false,
     }))
   }
   return stores.get(key)!
@@ -37,14 +39,19 @@ export function useConsoleStore(key: string) {
     state.messages.push({ role, content: trimmed })
   }
 
+  function setWaiting(value: boolean) {
+    state.waiting = value
+  }
+
   function handleSSEEvent(event: SSEEvent) {
     if (event.type === 'text') {
       const text = event.data.trim()
       if (!text) return
-      // `> ` 접두사는 사용자 echo — 무시 (이미 UI에 추가됨)
       if (text.startsWith('>')) return
+      state.waiting = false
       addMessage('assistant', text)
     } else if (event.type === 'tool_call') {
+      state.waiting = false
       try {
         const tool = JSON.parse(event.data)
         addMessage('tool', `도구 호출: ${tool.name}`)
@@ -52,8 +59,10 @@ export function useConsoleStore(key: string) {
         addMessage('tool', event.data)
       }
     } else if (event.type === 'error') {
+      state.waiting = false
       addMessage('error', event.data)
     } else if (event.type === 'done') {
+      state.waiting = false
       addMessage('system', '완료')
     }
   }
@@ -94,12 +103,14 @@ export function useConsoleStore(key: string) {
 
   function reset() {
     clear()
+    state.waiting = false
     state.messages.push({ role: 'system', content: '세션이 초기화되었습니다.' })
   }
 
   return {
     state,
     addMessage,
+    setWaiting,
     connect,
     disconnect,
     clear,
