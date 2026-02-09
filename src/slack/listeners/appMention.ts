@@ -18,13 +18,14 @@ export function registerAppMention(app: App): void {
 
     logger.debug(`멘션 수신: ${userId} in ${event.channel}`);
 
-    // 대화 모드 결정: 스레드 내 멘션 → thread, 채널 top-level 멘션 → channel
-    const mode: ConversationMode = event.thread_ts ? 'thread' : 'channel';
     const threadTs = event.thread_ts || event.ts;
 
     // 접근 제어 + Owner 판별
     const { allowed, isOwner } = await checkAccess(userId, say, threadTs);
     if (!allowed) return;
+
+    // 대화 모드 결정: 스레드 → thread, 채널 top-level Owner → thread, 채널 top-level 비Owner → channel
+    const mode: ConversationMode = event.thread_ts ? 'thread' : (isOwner ? 'thread' : 'channel');
 
     // 봇 멘션 태그 제거 후 입력 텍스트 추출
     const inputText = stripBotMention(event.text ?? '', botUserId);
