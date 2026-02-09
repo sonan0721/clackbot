@@ -45,7 +45,7 @@
         type="text"
         class="console-chat-input"
         placeholder="메시지 입력..."
-        @keydown.enter="send"
+        @keydown.enter="onEnter"
       />
       <button class="btn btn-primary" style="margin-left: 8px;" :disabled="!inputText.trim()" @click="send">전송</button>
     </div>
@@ -77,6 +77,11 @@ watch(() => store.state.messages.length, () => {
     }
   })
 })
+
+function onEnter(e: KeyboardEvent) {
+  if (e.isComposing) return
+  send()
+}
 
 async function send() {
   const message = inputText.value.trim()

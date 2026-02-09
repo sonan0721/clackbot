@@ -76,7 +76,7 @@
               class="chat-input-field"
               placeholder="메시지를 입력하세요..."
               :disabled="sending"
-              @keydown.enter="sendMessage"
+              @keydown.enter="onEnter"
             />
             <button class="btn btn-primary" style="margin-left: 8px;" :disabled="sending || !inputText.trim()" @click="sendMessage">전송</button>
           </div>
@@ -242,6 +242,11 @@ function flushStreamLines() {
     })
   }
   streamLines.value = []
+}
+
+function onEnter(e: KeyboardEvent) {
+  if (e.isComposing) return
+  sendMessage()
 }
 
 async function sendMessage() {
