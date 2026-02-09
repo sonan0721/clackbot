@@ -7,8 +7,6 @@ import { logger } from '../utils/logger.js';
 import toolsRouter from './api/tools.js';
 import conversationsRouter from './api/conversations.js';
 import configRouter from './api/config.js';
-import consoleRouter from './api/console.js';
-import supervisorRouter, { initSupervisorSessions } from './api/supervisor.js';
 import pluginsRouter from './api/plugins.js';
 import slackRouter from './api/slack.js';
 
@@ -40,7 +38,6 @@ export function createWebServer() {
       botUserId: config.slack.botUserId || null,
       teamName: config.slack.teamName || null,
       accessMode: config.accessMode,
-      replyMode: config.replyMode,
       webPort: config.webPort,
     });
   });
@@ -48,9 +45,6 @@ export function createWebServer() {
   app.use('/api/tools', toolsRouter);
   app.use('/api/conversations', conversationsRouter);
   app.use('/api/config', configRouter);
-  app.use('/api/console', consoleRouter);
-  app.use('/api/supervisor', supervisorRouter);
-  initSupervisorSessions();
   app.use('/api/plugins', pluginsRouter);
   app.use('/api/slack', slackRouter);
 

@@ -28,8 +28,10 @@ Clackbot은 사용자의 **로컬 머신**에서 실행되며, **Claude Code Age
 
 ### 출력
 
-- owner 모드: Slack 스레드에 응답 게시
-- public 모드: 채널 멘션 시 채널에 직접 응답, 스레드 내에서는 스레드 응답
+- Owner DM: 모든 도구 사용 가능 (감독 모드)
+- Owner 채널 멘션: 스레드 응답, 모든 도구 사용 가능
+- 비Owner 채널 멘션 (public 모드): 일반 대화만, 도구 없음
+- Owner 모드 비Owner 멘션: 안내 메시지
 - MCP 도구를 통한 외부 서비스 연동
 
 ---
@@ -65,13 +67,12 @@ clackbot/
 │   ├── agent/                   # Claude Agent SDK 연동
 │   │   ├── claude.ts            # query() 래퍼
 │   │   ├── systemPrompt.ts      # 규칙 + 성격 프리셋 → 시스템 프롬프트
-│   │   ├── permissions.ts       # canUseTool 안전 정책
-│   │   ├── installer.ts         # 플러그인 설치 전용 에이전트
+│   │   ├── permissions.ts       # createCanUseTool 팩토리 (역할 기반)
 │   │   └── tools/               # MCP 도구 (내장 + MCP 서버 + 플러그인 로더)
-│   ├── web/                     # 웹 대시보드 (Express + SPA)
+│   ├── web/                     # 웹 대시보드 (Express + Vue SPA)
 │   │   ├── server.ts
-│   │   ├── api/                 # REST API + SSE (tools, conversations, config, console, slack)
-│   │   └── public/              # 프론트엔드 (index.html, app.js, style.css)
+│   │   ├── api/                 # REST API (tools, conversations, config, plugins, slack)
+│   │   └── public/              # 프론트엔드 (Vite 빌드 출력)
 │   ├── store/conversations.ts   # SQLite 대화 이력 (세션별 그룹핑)
 │   ├── session/manager.ts       # 세션 생명주기 (자동 리셋)
 │   ├── config/                  # Zod 스키마, 경로, 설정 로더
@@ -111,38 +112,44 @@ clackbot start
 ```
 Slack @봇이름 멘션/DM
   → Bolt App (Socket Mode)
-  → accessControl (owner/public 모드)
-  → SessionManager (스레드별 세션, 자동 리셋)
+  → accessControl (owner/public 모드, isOwner 판별)
+  → Slack 파일 다운로드 (첨부파일 있을 시)
+  → SessionManager (스레드별 세션, SQLite 영속, 자동 리셋)
   → 스레드 컨텍스트 조회 (conversations.replies)
   → 대화 기록 저장 (SQLite)
-  → Agent SDK query({ prompt, cwd, mcpServers, canUseTool, resume })
-  → Claude → MCP 도구 호출 (slack_post, 플러그인 등)
-  → 응답 저장 → Slack에 say()
+  → "생각 중..." 상태 메시지 게시
+  → Agent SDK query({ prompt, cwd, mcpServers, canUseTool(isOwner), resume })
+  → Claude → MCP 도구 호출 (slack_post, slack_send_dm, 플러그인 등)
+  → 응답 저장 → chat.update()로 상태 메시지를 응답으로 교체
 ```
 
 ---
 
-## 6) 접근 모드
+## 6) 접근 모드 & 역할 기반 권한
 
-| 모드 | 동작 |
-|------|------|
-| `"owner"` (기본) | 소유자만 응답, 다른 사용자에게 안내 메시지 |
-| `"public"` | 누구나 @봇이름 멘션으로 사용 가능. 채널 멘션 시 채널에 직접 응답 |
+| 모드 | Owner DM | Owner 채널 멘션 | 비Owner 채널 멘션 |
+|------|----------|----------------|-----------------|
+| `"owner"` (기본) | 모든 도구 허용 (감독 모드) | 스레드 응답, 모든 도구 허용 | 안내 메시지 |
+| `"public"` | 모든 도구 허용 (감독 모드) | 스레드 응답, 모든 도구 허용 | 일반 대화만, 도구 없음 |
+
+- **Owner DM (감독 모드)**: CLAUDE.md/rules 편집, MCP 서버 설치/관리, 설정 변경, 파일/이미지 확인 가능
+- **비Owner**: 대화만 가능, 모든 도구 차단
 
 변경: `clackbot config set accessMode public` 또는 대시보드 설정
 
 ---
 
-## 7) 성격 프리셋
+## 7) 성격 프리셋 (MBTI 기반)
 
-config의 `personality.preset`으로 응답 스타일 선택:
+config의 `personality.preset`으로 응답 스타일 선택 (16가지 MBTI 유형):
 
-| 프리셋 | 톤 |
-|--------|------|
-| `professional` (기본) | 간결하고 명확. 3~5줄. 불릿 포인트. 이모지 지양. |
-| `friendly` | 친근한 동료 톤. 이모지 적절히 사용. 캐주얼. |
-| `detailed` | 꼼꼼하고 상세. 배경 설명 포함. 5~15줄. 단계별 안내. |
-| `custom` | config.personality.customPrompt 그대로 사용 |
+| 그룹 | 프리셋 | 톤 |
+|------|--------|------|
+| 분석가 (NT) | `intj`, `intp`, `entj`, `entp` | 논리적/전략적/분석적 |
+| 외교관 (NF) | `infj`, `infp`, `enfj`, `enfp` | 공감적/이상적/열정적 |
+| 관리자 (SJ) | `istj` (기본), `isfj`, `estj`, `esfj` | 체계적/실용적/신뢰감 |
+| 탐험가 (SP) | `istp`, `isfp`, `estp`, `esfp` | 직접적/유연/행동지향 |
+| 커스텀 | `custom` | config.personality.customPrompt 사용 |
 
 ---
 
@@ -150,7 +157,7 @@ config의 `personality.preset`으로 응답 스타일 선택:
 
 ### MCP 서버 (권장)
 
-대시보드 콘솔에서 자연어로 검색/설치. config.json의 `mcpServers`에 저장:
+Owner DM으로 봇에게 자연어로 설치 요청하거나 수동으로 config.json에 추가. `mcpServers`에 저장:
 ```json
 {
   "mcpServers": {
@@ -171,29 +178,32 @@ config의 `personality.preset`으로 응답 스타일 선택:
 
 ## 9) 웹 대시보드
 
-`clackbot start` 시 http://localhost:3847 에서 접근 가능.
+`clackbot start` 시 http://localhost:3847 에서 접근 가능. 순수 모니터링 + 설정 대시보드.
 
 | 페이지 | 내용 |
 |--------|------|
 | 홈 | 봇 상태, 최근 대화 요약 |
 | 대화 이력 | 세션(스레드)별 대화 목록, 클릭 시 상세 보기, 검색 |
-| 연동 툴 | 내장 도구 + MCP 서버 목록, 인터랙티브 설치 콘솔 |
+| 연동 툴 | 내장 도구 + MCP 서버 목록 (설치/관리는 DM으로) |
 | 설정 | 접근 모드, 성격 프리셋, 세션 설정, 소유자 지정 |
 
 ---
 
 ## 10) 안전 정책 (canUseTool)
 
-| 허용 | 차단 |
-|------|------|
-| Read, Grep, Glob, WebSearch, WebFetch | Write, Edit, Bash, NotebookEdit |
-| MCP 도구 (mcp__*) | 알 수 없는 도구 |
+역할 기반 이원화:
+
+| 역할 | 허용 도구 | 차단 도구 |
+|------|----------|----------|
+| **Owner** | 모든 도구 (Read, Write, Edit, Bash, MCP 등) | 없음 |
+| **비Owner** | 없음 (일반 대화만) | 모든 도구 |
 
 ---
 
 ## 11) 세션 관리
 
 - 스레드별 세션 ID 유지 (Agent SDK `resume` 파라미터)
+- **SQLite 영속**: 서버 재시작 후에도 세션(resumeId 포함) 유지
 - 자동 리셋: 메시지 20개 초과 / 30분 경과
 - 리셋 시 새 세션 생성
 
@@ -261,7 +271,7 @@ config의 `personality.preset`으로 응답 스타일 선택:
 
 ## 17) Slack 앱 필요 권한
 
-**Bot Token Scopes**: `app_mentions:read`, `channels:history`, `channels:read`, `chat:write`, `groups:history`, `groups:read`, `im:history`, `im:read`, `im:write`, `reactions:write`, `users:read`
+**Bot Token Scopes**: `app_mentions:read`, `channels:history`, `channels:read`, `chat:write`, `files:read`, `groups:history`, `groups:read`, `im:history`, `im:read`, `im:write`, `reactions:write`, `users:read`
 
 **Event Subscriptions**: `app_mention`, `message.im`
 

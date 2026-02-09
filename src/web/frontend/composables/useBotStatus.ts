@@ -8,7 +8,6 @@ interface BotState {
   botName: string | null
   teamName: string | null
   accessMode: string
-  replyMode: string
   loaded: boolean
 }
 
@@ -18,7 +17,6 @@ const state = reactive<BotState>({
   botName: null,
   teamName: null,
   accessMode: 'owner',
-  replyMode: 'thread',
   loaded: false,
 })
 
@@ -31,7 +29,6 @@ export function useBotStatus() {
       state.botName = status.botName
       state.teamName = status.teamName
       state.accessMode = status.accessMode
-      state.replyMode = status.replyMode
       state.loaded = true
     } catch {
       state.online = false

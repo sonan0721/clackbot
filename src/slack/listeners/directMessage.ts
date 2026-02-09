@@ -1,5 +1,7 @@
 import type { App } from '@slack/bolt';
+import { loadConfig } from '../../config/index.js';
 import { checkAccess } from '../middleware/accessControl.js';
+import { downloadSlackFiles, cleanupFiles } from '../fileHandler.js';
 import { handleMessage } from './handler.js';
 import { logger } from '../../utils/logger.js';
 
@@ -24,13 +26,27 @@ export function registerDirectMessage(app: App): void {
     const channelId = event.channel;
     const threadTs = String(evt.thread_ts ?? '') || String(evt.ts ?? '');
 
-    if (!userId || !text.trim() || !threadTs) return;
+    if (!userId || !threadTs) return;
+
+    // 파일만 보내고 텍스트가 없는 경우에도 처리할 수 있도록 텍스트 기본값 설정
+    const files = evt.files as Array<{ name?: string; mimetype?: string; url_private_download?: string }> | undefined;
+    const hasFiles = files && files.length > 0;
+    const inputText = text.trim() || (hasFiles ? '첨부된 파일을 확인해주세요.' : '');
+
+    if (!inputText) return;
 
     logger.debug(`DM 수신: ${userId}`);
 
-    // 접근 제어
-    const allowed = await checkAccess(userId, say);
+    // 접근 제어 + Owner 판별
+    const config = loadConfig();
+    const { allowed, isOwner } = await checkAccess(userId, say);
     if (!allowed) return;
+
+    // 파일 다운로드 처리
+    let attachments;
+    if (hasFiles && config.slack.botToken) {
+      attachments = await downloadSlackFiles(files, config.slack.botToken);
+    }
 
     // 스레드 컨텍스트 조회
     let threadMessages: Array<{ user: string; text: string }> = [];
@@ -56,13 +72,24 @@ export function registerDirectMessage(app: App): void {
     }
 
     // 메시지 처리
-    await handleMessage({
-      inputText: text,
-      userId,
-      channelId,
-      threadTs,
-      threadMessages,
-      say,
-    });
+    try {
+      await handleMessage({
+        inputText,
+        userId,
+        channelId,
+        threadTs,
+        threadMessages,
+        say,
+        client,
+        isOwner,
+        attachments,
+        context: 'dm',
+      });
+    } finally {
+      // 다운로드된 파일 정리
+      if (attachments) {
+        cleanupFiles(attachments);
+      }
+    }
   });
 }

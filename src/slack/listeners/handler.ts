@@ -1,4 +1,5 @@
-import { queryAgent } from '../../agent/claude.js';
+import type { WebClient } from '@slack/web-api';
+import { queryAgent, type Attachment } from '../../agent/claude.js';
 import { sessionManager } from '../../session/manager.js';
 import { saveConversation } from '../../store/conversations.js';
 import { getLocalDir } from '../../config/paths.js';
@@ -14,12 +15,34 @@ export interface HandleMessageParams {
   threadTs: string;
   threadMessages: Array<{ user: string; text: string }>;
   say: (params: { text: string; thread_ts?: string }) => Promise<unknown>;
+  client: WebClient;
+  isOwner: boolean;
   /** true면 스레드 대신 채널에 직접 응답 */
   replyInChannel?: boolean;
+  /** 첨부파일 */
+  attachments?: Attachment[];
+  /** 컨텍스트 (DM or 멘션) */
+  context?: 'dm' | 'mention';
 }
 
 export async function handleMessage(params: HandleMessageParams): Promise<void> {
-  const { inputText, userId, channelId, threadTs, threadMessages, say, replyInChannel } = params;
+  const {
+    inputText, userId, channelId, threadTs, threadMessages,
+    say, client, isOwner, replyInChannel, attachments, context = 'mention',
+  } = params;
+
+  // "생각 중..." 메시지 전송
+  let thinkingTs: string | undefined;
+  try {
+    const thinkingMsg = await client.chat.postMessage({
+      channel: channelId,
+      text: ':hourglass_flowing_sand: 생각 중...',
+      ...(replyInChannel ? {} : { thread_ts: threadTs }),
+    });
+    thinkingTs = thinkingMsg.ts as string | undefined;
+  } catch (error) {
+    logger.warn(`생각 중 메시지 전송 실패: ${error}`);
+  }
 
   try {
     const cwd = getLocalDir();
@@ -27,7 +50,6 @@ export async function handleMessage(params: HandleMessageParams): Promise<void> 
     // 세션 관리
     const session = sessionManager.getOrCreate(threadTs);
 
-    // "생각 중" 리액션 또는 메시지 (선택적)
     logger.debug(`처리 시작: "${inputText.slice(0, 50)}..."`);
 
     // Claude Agent 호출
@@ -37,6 +59,9 @@ export async function handleMessage(params: HandleMessageParams): Promise<void> 
       threadMessages,
       sessionId: session.id,
       resumeId: session.resumeId,
+      isOwner,
+      attachments,
+      context,
     });
 
     // 세션 업데이트
@@ -45,12 +70,31 @@ export async function handleMessage(params: HandleMessageParams): Promise<void> 
       messageCount: session.messageCount + 1,
     });
 
-    // 응답 전송 — replyInChannel이면 채널에, 아니면 스레드에
+    // 응답 전송 — "생각 중..." 메시지를 교체
     const responseText = truncateText(response.text);
-    if (replyInChannel) {
-      await say({ text: responseText });
+
+    if (thinkingTs) {
+      try {
+        await client.chat.update({
+          channel: channelId,
+          ts: thinkingTs,
+          text: responseText,
+        });
+      } catch {
+        // update 실패 시 새 메시지로 전송
+        if (replyInChannel) {
+          await say({ text: responseText });
+        } else {
+          await say({ text: responseText, thread_ts: threadTs });
+        }
+      }
     } else {
-      await say({ text: responseText, thread_ts: threadTs });
+      // thinkingTs가 없으면 직접 응답
+      if (replyInChannel) {
+        await say({ text: responseText });
+      } else {
+        await say({ text: responseText, thread_ts: threadTs });
+      }
     }
 
     // 대화 기록 저장
@@ -68,10 +112,26 @@ export async function handleMessage(params: HandleMessageParams): Promise<void> 
   } catch (error) {
     logger.error(`메시지 처리 실패: ${error instanceof Error ? error.message : String(error)}`);
 
+    const errorText = '죄송합니다. 메시지 처리 중 오류가 발생했습니다.';
+
+    // "생각 중..." 메시지를 에러 메시지로 교체
+    if (thinkingTs) {
+      try {
+        await client.chat.update({
+          channel: channelId,
+          ts: thinkingTs,
+          text: errorText,
+        });
+        return;
+      } catch {
+        // update 실패 시 새 메시지
+      }
+    }
+
     if (replyInChannel) {
-      await say({ text: '죄송합니다. 메시지 처리 중 오류가 발생했습니다.' });
+      await say({ text: errorText });
     } else {
-      await say({ text: '죄송합니다. 메시지 처리 중 오류가 발생했습니다.', thread_ts: threadTs });
+      await say({ text: errorText, thread_ts: threadTs });
     }
   }
 }

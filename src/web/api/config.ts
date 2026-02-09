@@ -37,14 +37,6 @@ router.put('/', (req, res) => {
       config.accessMode = updates.accessMode;
     }
 
-    if (updates.replyMode !== undefined) {
-      if (!['thread', 'chat'].includes(updates.replyMode)) {
-        res.status(400).json({ error: 'replyMode는 "thread" 또는 "chat"이어야 합니다.' });
-        return;
-      }
-      config.replyMode = updates.replyMode;
-    }
-
     if (updates.webPort !== undefined) {
       const port = Number(updates.webPort);
       if (!Number.isInteger(port) || port < 1 || port > 65535) {

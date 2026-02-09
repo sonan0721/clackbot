@@ -58,16 +58,11 @@
       </table>
     </div>
 
-    <GuideUploader @submit="onGuideSubmit" />
-
-    <ConsolePanel
-      ref="consoleRef"
-      title="플러그인 설치 콘솔"
-      store-key="tools"
-      sse-url="/api/console/events"
-      send-url="/api/console/send"
-      reset-url="/api/console/reset"
-    />
+    <div class="card" style="margin-top: 16px;">
+      <p style="color: var(--text-muted); font-size: 14px;">
+        MCP 서버 설치/관리는 봇에게 DM으로 요청하세요.
+      </p>
+    </div>
   </div>
 </template>
 
@@ -75,10 +70,7 @@
 import { ref, onMounted } from 'vue'
 import { api } from '../composables/useApi'
 import type { ToolsResponse, BuiltinTool, McpServer, PluginTool, ConfigResponse } from '../types/api'
-import ConsolePanel from '../components/ConsolePanel.vue'
-import GuideUploader from '../components/GuideUploader.vue'
 
-const consoleRef = ref<InstanceType<typeof ConsolePanel>>()
 const builtin = ref<BuiltinTool[]>([])
 const mcpServers = ref<McpServer[]>([])
 const plugins = ref<PluginTool[]>([])
@@ -110,11 +102,6 @@ async function removeMcp(name: string) {
   } catch (err) {
     alert('삭제 실패: ' + (err instanceof Error ? err.message : String(err)))
   }
-}
-
-function onGuideSubmit(mdContent: string) {
-  const message = `다음 연동 가이드를 분석해서 필요한 MCP 서버를 설치해줘:\n\n${mdContent}`
-  consoleRef.value?.sendMessage(message)
 }
 
 onMounted(loadTools)

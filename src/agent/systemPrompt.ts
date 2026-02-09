@@ -178,18 +178,18 @@ const PERSONALITY_PRESETS: Record<string, string> = {
  * 프로젝트 디렉토리에서 규칙 파일들을 읽어 시스템 프롬프트 구성
  * 우선순위: CLAUDE.md > rules.md > .clackbot/rules.md
  */
-export function buildSystemPrompt(cwd: string): string {
+export function buildSystemPrompt(cwd: string, context: 'dm' | 'mention' = 'mention'): string {
   const parts: string[] = [];
   const config = loadConfig();
 
   // 성격 preset 적용
-  const preset = config.personality?.preset ?? 'professional';
+  const preset = config.personality?.preset ?? 'istj';
   let personalityPrompt: string;
 
   if (preset === 'custom' && config.personality?.customPrompt) {
     personalityPrompt = config.personality.customPrompt;
   } else {
-    personalityPrompt = PERSONALITY_PRESETS[preset] ?? PERSONALITY_PRESETS.professional;
+    personalityPrompt = PERSONALITY_PRESETS[preset] ?? PERSONALITY_PRESETS.istj;
   }
 
   // 기본 Clackbot 역할 정의
@@ -198,10 +198,25 @@ export function buildSystemPrompt(cwd: string): string {
 
 ${personalityPrompt}`);
 
-  parts.push(`\n글로벌 규칙:
+  // 컨텍스트별 규칙
+  if (context === 'dm') {
+    parts.push(`\n## DM 감독 모드
+Owner가 DM을 통해 직접 감독하고 있습니다.
+- CLAUDE.md / rules/ 파일 수정 가능 (Write/Edit 도구 사용)
+- MCP 서버 설치/제거 가능 (Bash 도구로 npm 실행, config.json 수정)
+- 설정 변경 가능 (config.json 직접 수정)
+- 공유된 파일/이미지를 Read 도구로 확인 가능
+- DM에서 Owner에게 먼저 메시지를 보낼 수 있습니다 (slack_send_dm 도구)
+
+글로벌 규칙:
+- 사용자에게 config.json을 직접 편집하라고 안내하지 마세요 — 대신 직접 수정하세요
+- MCP 서버 설치가 필요하면 Bash 도구로 직접 처리하세요`);
+  } else {
+    parts.push(`\n글로벌 규칙:
 - 사용자에게 config.json이나 설정 파일을 직접 편집하라고 안내하지 마세요
-- MCP 서버 설치/설정은 대시보드의 "연동 툴" 페이지 콘솔을 통해 안내하세요
-- 환경변수나 API 키 설정이 필요하면 대시보드 콘솔에서 대화로 처리하도록 안내하세요`);
+- MCP 서버 설치/설정이 필요하면 Owner에게 DM으로 요청하라고 안내하세요
+- 환경변수나 API 키 설정이 필요하면 Owner DM을 통해 처리하도록 안내하세요`);
+  }
 
   // cwd는 .clackbot/ 디렉토리
   // CLAUDE.md 읽기 (.clackbot/CLAUDE.md)

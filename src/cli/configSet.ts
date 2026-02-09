@@ -3,7 +3,7 @@ import { logger } from '../utils/logger.js';
 
 // clackbot config set <key> <value> — 설정 변경
 
-const ALLOWED_KEYS = ['accessMode', 'replyMode', 'webPort', 'ownerUserId', 'session.maxMessages', 'session.timeoutMinutes'] as const;
+const ALLOWED_KEYS = ['accessMode', 'webPort', 'ownerUserId', 'session.maxMessages', 'session.timeoutMinutes'] as const;
 
 export async function configSetCommand(key: string, value: string): Promise<void> {
   if (!ALLOWED_KEYS.includes(key as typeof ALLOWED_KEYS[number])) {
@@ -21,14 +21,6 @@ export async function configSetCommand(key: string, value: string): Promise<void
         process.exit(1);
       }
       config.accessMode = value;
-      break;
-
-    case 'replyMode':
-      if (value !== 'thread' && value !== 'chat') {
-        logger.error('replyMode는 "thread" 또는 "chat"이어야 합니다.');
-        process.exit(1);
-      }
-      config.replyMode = value;
       break;
 
     case 'webPort': {

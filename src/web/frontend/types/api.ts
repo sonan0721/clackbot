@@ -7,7 +7,6 @@ export interface StatusResponse {
   botUserId: string | null
   teamName: string | null
   accessMode: 'owner' | 'public'
-  replyMode: 'thread' | 'chat'
   webPort: number
 }
 
@@ -63,7 +62,6 @@ export interface ToolsResponse {
 
 export interface ConfigResponse {
   accessMode: 'owner' | 'public'
-  replyMode: 'thread' | 'chat'
   ownerUserId?: string
   webPort: number
   session: {
@@ -84,38 +82,8 @@ export interface ConfigResponse {
   mcpServers: Record<string, { command: string; args: string[]; env?: Record<string, string> }>
 }
 
-export interface SupervisorFile {
-  slug: string
-  path: string
-  exists: boolean
-}
-
-export interface FileContentResponse {
-  content: string
-  exists: boolean
-}
-
-export interface SupervisorSession {
-  id: string
-  title: string
-  messageCount: number
-  createdAt: string
-  updatedAt: string
-}
-
-export interface ChatMessage {
-  role: 'user' | 'assistant' | 'tool'
-  content: string
-  timestamp: string
-}
-
 export interface SlackUser {
   id: string
   displayName: string
   realName: string
-}
-
-export interface SSEEvent {
-  type: 'connected' | 'text' | 'tool_call' | 'error' | 'done' | 'file_changed'
-  data: string
 }

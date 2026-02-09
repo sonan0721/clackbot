@@ -19,11 +19,6 @@ const router = createRouter({
       component: () => import('./views/ToolsView.vue'),
     },
     {
-      path: '/supervisor',
-      name: 'supervisor',
-      component: () => import('./views/SupervisorView.vue'),
-    },
-{
       path: '/settings',
       name: 'settings',
       component: () => import('./views/SettingsView.vue'),

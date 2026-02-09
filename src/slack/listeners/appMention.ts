@@ -2,6 +2,7 @@ import type { App } from '@slack/bolt';
 import { loadConfig } from '../../config/index.js';
 import { checkAccess } from '../middleware/accessControl.js';
 import { stripBotMention } from '../../utils/slackFormat.js';
+import { downloadSlackFiles, cleanupFiles } from '../fileHandler.js';
 import { handleMessage } from './handler.js';
 import { logger } from '../../utils/logger.js';
 
@@ -17,9 +18,9 @@ export function registerAppMention(app: App): void {
 
     logger.debug(`멘션 수신: ${userId} in ${event.channel}`);
 
-    // 접근 제어
+    // 접근 제어 + Owner 판별
     const threadTs = event.thread_ts || event.ts;
-    const allowed = await checkAccess(userId, say, threadTs);
+    const { allowed, isOwner } = await checkAccess(userId, say, threadTs);
     if (!allowed) return;
 
     // 봇 멘션 태그 제거 후 입력 텍스트 추출
@@ -51,18 +52,36 @@ export function registerAppMention(app: App): void {
       }
     }
 
-    // chat 모드 + 채널 최상위 메시지면 채널에 직접 응답
-    const replyInChannel = config.replyMode === 'chat' && !event.thread_ts;
+    // 파일 다운로드 처리
+    const evt = event as unknown as Record<string, unknown>;
+    const files = evt.files as Array<{ name?: string; mimetype?: string; url_private_download?: string }> | undefined;
+    let attachments;
+    if (files && files.length > 0 && config.slack.botToken) {
+      attachments = await downloadSlackFiles(files, config.slack.botToken);
+    }
 
-    // 메시지 처리 (Claude Agent 호출)
-    await handleMessage({
-      inputText,
-      userId,
-      channelId: event.channel,
-      threadTs,
-      threadMessages,
-      say,
-      replyInChannel,
-    });
+    // 비Owner의 채널 최상위 멘션 → 채널에 직접 응답
+    const replyInChannel = !isOwner && !event.thread_ts;
+
+    // 메시지 처리
+    try {
+      await handleMessage({
+        inputText,
+        userId,
+        channelId: event.channel,
+        threadTs,
+        threadMessages,
+        say,
+        client,
+        isOwner,
+        replyInChannel,
+        attachments,
+        context: 'mention',
+      });
+    } finally {
+      if (attachments) {
+        cleanupFiles(attachments);
+      }
+    }
   });
 }

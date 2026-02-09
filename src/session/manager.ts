@@ -1,28 +1,45 @@
 import { v4 as uuidv4 } from 'uuid';
 import { loadConfig } from '../config/index.js';
+import { upsertSlackSession, getSlackSession, deleteSlackSession } from '../store/conversations.js';
 import { logger } from '../utils/logger.js';
 import type { Session } from './types.js';
 
-// 세션 생명주기 관리 — 스레드별 세션, 자동 리셋
+// 세션 생명주기 관리 — SQLite 영속화, 스레드별 세션, 자동 리셋
 
 class SessionManager {
-  private sessions = new Map<string, Session>();
-
   /** 스레드에 대한 세션 조회 또는 생성 */
   getOrCreate(threadTs: string): Session {
-    const existing = this.sessions.get(threadTs);
+    const existing = getSlackSession(threadTs);
 
     if (existing) {
+      const session: Session = {
+        id: existing.sessionId,
+        threadTs: existing.threadTs,
+        resumeId: existing.resumeId,
+        messageCount: existing.messageCount,
+        createdAt: existing.createdAt,
+        lastActiveAt: existing.lastActiveAt,
+      };
+
       // 자동 리셋 조건 확인
-      if (this.shouldReset(existing)) {
+      if (this.shouldReset(session)) {
         logger.debug(`세션 자동 리셋: ${threadTs}`);
-        this.sessions.delete(threadTs);
+        deleteSlackSession(threadTs);
         return this.createSession(threadTs);
       }
 
       // 활성 시간 갱신
-      existing.lastActiveAt = Date.now();
-      return existing;
+      session.lastActiveAt = Date.now();
+      upsertSlackSession({
+        threadTs: session.threadTs,
+        sessionId: session.id,
+        resumeId: session.resumeId,
+        messageCount: session.messageCount,
+        createdAt: session.createdAt,
+        lastActiveAt: session.lastActiveAt,
+      });
+
+      return session;
     }
 
     return this.createSession(threadTs);
@@ -30,23 +47,26 @@ class SessionManager {
 
   /** 세션 업데이트 */
   update(threadTs: string, updates: Partial<Pick<Session, 'resumeId' | 'messageCount'>>): void {
-    const session = this.sessions.get(threadTs);
-    if (!session) return;
+    const existing = getSlackSession(threadTs);
+    if (!existing) return;
 
-    if (updates.resumeId !== undefined) session.resumeId = updates.resumeId;
-    if (updates.messageCount !== undefined) session.messageCount = updates.messageCount;
-    session.lastActiveAt = Date.now();
+    const resumeId = updates.resumeId !== undefined ? updates.resumeId : existing.resumeId;
+    const messageCount = updates.messageCount !== undefined ? updates.messageCount : existing.messageCount;
+
+    upsertSlackSession({
+      threadTs,
+      sessionId: existing.sessionId,
+      resumeId,
+      messageCount,
+      createdAt: existing.createdAt,
+      lastActiveAt: Date.now(),
+    });
   }
 
   /** 세션 삭제 (수동 리셋) */
   reset(threadTs: string): void {
-    this.sessions.delete(threadTs);
+    deleteSlackSession(threadTs);
     logger.debug(`세션 수동 리셋: ${threadTs}`);
-  }
-
-  /** 모든 세션 초기화 */
-  clear(): void {
-    this.sessions.clear();
   }
 
   /** 자동 리셋 조건 확인 */
@@ -78,7 +98,15 @@ class SessionManager {
       lastActiveAt: Date.now(),
     };
 
-    this.sessions.set(threadTs, session);
+    upsertSlackSession({
+      threadTs: session.threadTs,
+      sessionId: session.id,
+      resumeId: session.resumeId,
+      messageCount: session.messageCount,
+      createdAt: session.createdAt,
+      lastActiveAt: session.lastActiveAt,
+    });
+
     return session;
   }
 }

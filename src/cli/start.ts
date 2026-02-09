@@ -9,8 +9,8 @@ import { createSlackApp, startSlackApp } from '../slack/app.js';
 import { startWebServer } from '../web/server.js';
 import { initDatabase, closeDatabase } from '../store/conversations.js';
 import { setSlackClient } from '../agent/tools/builtin/slackPost.js';
+import { setSlackClientForDm } from '../agent/tools/builtin/slackSendDm.js';
 import { setSharedSlackClient } from '../slack/client.js';
-import { sessionManager } from '../session/manager.js';
 import semver from 'semver';
 import { logger } from '../utils/logger.js';
 
@@ -220,6 +220,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
 
     // Slack 클라이언트를 내장 도구 및 공유 싱글턴에 주입
     setSlackClient(app.client as unknown as Parameters<typeof setSlackClient>[0]);
+    setSlackClientForDm(app.client as unknown as Parameters<typeof setSlackClientForDm>[0]);
     setSharedSlackClient(app.client);
 
     await startSlackApp(app);
@@ -290,7 +291,6 @@ export async function startCommand(options: StartOptions): Promise<void> {
       try {
         await app.stop();
         closeDatabase();
-        sessionManager.clear();
         logger.success('정상 종료되었습니다.');
       } catch (error) {
         logger.error(`종료 중 오류: ${error instanceof Error ? error.message : String(error)}`);

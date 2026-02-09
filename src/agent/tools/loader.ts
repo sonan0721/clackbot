@@ -7,6 +7,7 @@ import { loadConfig } from '../../config/index.js';
 import { loadPlugins } from '../../plugins/registry.js';
 import { slackPostTool } from './builtin/slackPost.js';
 import { slackReadChannelTool } from './builtin/slackReadChannel.js';
+import { slackSendDmTool } from './builtin/slackSendDm.js';
 import { memoryReadTool, memoryWriteTool } from './builtin/memory.js';
 import { logger } from '../../utils/logger.js';
 
@@ -213,7 +214,7 @@ export function getMcpServers(cwd?: string): Record<string, McpServerConfig> {
   servers['clackbot'] = createSdkMcpServer({
     name: 'clackbot-builtin',
     version: '1.0.0',
-    tools: [slackPostTool, slackReadChannelTool, memoryReadTool, memoryWriteTool],
+    tools: [slackPostTool, slackReadChannelTool, slackSendDmTool, memoryReadTool, memoryWriteTool],
   });
 
   // config.mcpServers에서 stdio MCP 서버 로드

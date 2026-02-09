@@ -15,9 +15,6 @@ export const ConfigSchema = z.object({
   // 접근 모드: owner(소유자 전용) / public(누구나)
   accessMode: z.enum(['owner', 'public']).default('owner'),
 
-  // 응답 모드: thread(항상 스레드) / chat(채널 최상위 멘션 시 채널에 직접 응답)
-  replyMode: z.enum(['thread', 'chat']).default('thread'),
-
   // 소유자 Slack User ID (login 시 자동 감지)
   ownerUserId: z.string().optional(),
 

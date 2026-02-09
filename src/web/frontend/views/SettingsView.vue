@@ -59,14 +59,6 @@
         </select>
       </div>
       <div class="form-group">
-        <label>응답 모드</label>
-        <select v-model="replyMode" class="form-control" style="max-width: 300px;">
-          <option value="thread">스레드 응답 (thread)</option>
-          <option value="chat">채널 응답 (chat)</option>
-        </select>
-        <div style="margin-top: 4px; font-size: 12px; color: var(--text-muted);">chat: 채널 최상위 멘션 시 채널에 직접 응답</div>
-      </div>
-      <div class="form-group">
         <label>소유자 Slack User ID</label>
         <select v-if="usersLoaded" v-model="ownerUserId" class="form-control" style="max-width: 300px;">
           <option value="">선택 안 함</option>
@@ -132,7 +124,6 @@ import type { ConfigResponse, SlackUser } from '../types/api'
 const preset = ref<string>('istj')
 const customPrompt = ref('')
 const accessMode = ref('owner')
-const replyMode = ref('thread')
 const ownerUserId = ref('')
 const maxMessages = ref(20)
 const timeoutMinutes = ref(30)
@@ -176,7 +167,6 @@ onMounted(async () => {
     preset.value = config.personality?.preset || 'istj'
     customPrompt.value = config.personality?.customPrompt || ''
     accessMode.value = config.accessMode
-    replyMode.value = config.replyMode
     ownerUserId.value = config.ownerUserId || ''
     maxMessages.value = config.session?.maxMessages || 20
     timeoutMinutes.value = config.session?.timeoutMinutes || 30
@@ -212,7 +202,6 @@ async function saveSettings() {
 
   const updates = {
     accessMode: accessMode.value,
-    replyMode: replyMode.value,
     ownerUserId: ownerUserId.value || undefined,
     webPort: webPort.value,
     session: {

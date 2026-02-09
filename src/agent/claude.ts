@@ -1,10 +1,16 @@
 import { query, type SDKMessage } from '@anthropic-ai/claude-code';
 import { buildSystemPrompt } from './systemPrompt.js';
-import { canUseTool } from './permissions.js';
+import { createCanUseTool } from './permissions.js';
 import { getMcpServers } from './tools/loader.js';
 import { logger } from '../utils/logger.js';
 
 // Claude Agent SDK query() 래퍼
+
+export interface Attachment {
+  name: string;
+  path: string;
+  mimetype: string;
+}
 
 export interface QueryParams {
   prompt: string;
@@ -12,6 +18,9 @@ export interface QueryParams {
   threadMessages?: Array<{ user: string; text: string }>;
   sessionId: string;
   resumeId?: string;
+  isOwner: boolean;
+  attachments?: Attachment[];
+  context?: 'dm' | 'mention';
 }
 
 export interface QueryResult {
@@ -24,22 +33,36 @@ export interface QueryResult {
  * Claude Agent SDK를 사용하여 응답 생성
  */
 export async function queryAgent(params: QueryParams): Promise<QueryResult> {
-  const { prompt, cwd, threadMessages, resumeId } = params;
+  const { prompt, cwd, threadMessages, resumeId, isOwner, attachments, context = 'mention' } = params;
 
   // 스레드 컨텍스트를 프롬프트에 포함
   let fullPrompt = prompt;
   if (threadMessages && threadMessages.length > 0) {
-    const context = threadMessages
+    const threadContext = threadMessages
       .map(m => `[${m.user}]: ${m.text}`)
       .join('\n');
-    fullPrompt = `스레드 대화 컨텍스트:\n${context}\n\n현재 메시지:\n${prompt}`;
+    fullPrompt = `스레드 대화 컨텍스트:\n${threadContext}\n\n현재 메시지:\n${prompt}`;
   }
 
-  // 시스템 프롬프트 생성
-  const systemPrompt = buildSystemPrompt(cwd);
+  // 첨부파일 정보를 프롬프트에 추가
+  if (attachments && attachments.length > 0) {
+    const attachmentLines = attachments.map(a => {
+      if (a.mimetype.startsWith('image/')) {
+        return `첨부 이미지: ${a.name} (경로: ${a.path}) — Read 도구로 확인하세요`;
+      }
+      return `첨부 파일: ${a.name} (경로: ${a.path}) — Read 도구로 확인하세요`;
+    });
+    fullPrompt += `\n\n${attachmentLines.join('\n')}`;
+  }
+
+  // 시스템 프롬프트 생성 (컨텍스트 분리)
+  const systemPrompt = buildSystemPrompt(cwd, context);
 
   // MCP 서버 설정 (내장 + 플러그인)
   const mcpServers = getMcpServers(cwd);
+
+  // 역할 기반 권한
+  const canUseTool = createCanUseTool(isOwner);
 
   // Agent SDK 호출
   const toolsUsed: string[] = [];
@@ -54,7 +77,7 @@ export async function queryAgent(params: QueryParams): Promise<QueryResult> {
         cwd,
         canUseTool,
         mcpServers,
-        maxTurns: 10,
+        maxTurns: isOwner ? 20 : 10,
         ...(resumeId ? { resume: resumeId } : {}),
       },
     });

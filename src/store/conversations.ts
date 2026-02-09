@@ -40,6 +40,18 @@ export function initDatabase(cwd?: string): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_conversations_created ON conversations(created_at);
   `);
 
+  // Slack 세션 테이블 (세션 영속화)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS slack_sessions (
+      thread_ts TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      resume_id TEXT,
+      message_count INTEGER DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      last_active_at INTEGER NOT NULL
+    )
+  `);
+
   // 슈퍼바이저 세션/메시지 테이블
   db.exec(`
     CREATE TABLE IF NOT EXISTS supervisor_sessions (
@@ -366,6 +378,70 @@ export function getSupervisorMessages(sessionId: string): SupervisorMessageRecor
     content: row.content,
     timestamp: row.timestamp,
   }));
+}
+
+// ─── Slack 세션 CRUD (세션 영속화) ───
+
+export interface SlackSessionRecord {
+  threadTs: string;
+  sessionId: string;
+  resumeId?: string;
+  messageCount: number;
+  createdAt: number;
+  lastActiveAt: number;
+}
+
+/** Slack 세션 upsert */
+export function upsertSlackSession(record: SlackSessionRecord): void {
+  const database = initDatabase();
+  database.prepare(`
+    INSERT INTO slack_sessions (thread_ts, session_id, resume_id, message_count, created_at, last_active_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(thread_ts) DO UPDATE SET
+      session_id = excluded.session_id,
+      resume_id = excluded.resume_id,
+      message_count = excluded.message_count,
+      last_active_at = excluded.last_active_at
+  `).run(
+    record.threadTs,
+    record.sessionId,
+    record.resumeId ?? null,
+    record.messageCount,
+    record.createdAt,
+    record.lastActiveAt,
+  );
+}
+
+/** Slack 세션 조회 */
+export function getSlackSession(threadTs: string): SlackSessionRecord | null {
+  const database = initDatabase();
+  const row = database.prepare(
+    'SELECT thread_ts, session_id, resume_id, message_count, created_at, last_active_at FROM slack_sessions WHERE thread_ts = ?'
+  ).get(threadTs) as {
+    thread_ts: string;
+    session_id: string;
+    resume_id: string | null;
+    message_count: number;
+    created_at: number;
+    last_active_at: number;
+  } | undefined;
+
+  if (!row) return null;
+
+  return {
+    threadTs: row.thread_ts,
+    sessionId: row.session_id,
+    resumeId: row.resume_id ?? undefined,
+    messageCount: row.message_count,
+    createdAt: row.created_at,
+    lastActiveAt: row.last_active_at,
+  };
+}
+
+/** Slack 세션 삭제 */
+export function deleteSlackSession(threadTs: string): void {
+  const database = initDatabase();
+  database.prepare('DELETE FROM slack_sessions WHERE thread_ts = ?').run(threadTs);
 }
 
 /** 단일 대화 조회 */
