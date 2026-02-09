@@ -71,13 +71,20 @@ async function checkForUpdates(branch: string): Promise<void> {
       oldVersion = pkg.version || '?';
     } catch { /* 무시 */ }
 
-    // 새 커밋 수 표시
-    const count = execFileSync(
+    // remote가 local보다 앞선 커밋 수 (behind 수)
+    const behindCount = execFileSync(
       'git',
       ['rev-list', '--count', `HEAD..origin/${branch}`],
       { cwd: installDir, encoding: 'utf-8', ...shellOpt },
     ).trim();
-    logger.info(`새 업데이트 발견 (${count}개 커밋). 업데이트 중...`);
+
+    // behind=0이면 로컬에 미푸시 커밋만 있는 상태 → 업데이트 불필요
+    if (behindCount === '0') {
+      logger.success('최신 버전입니다.');
+      return;
+    }
+
+    logger.info(`새 업데이트 발견 (${behindCount}개 커밋). 업데이트 중...`);
 
     // 브랜치 전환 (필요시)
     const currentBranch = execFileSync(
