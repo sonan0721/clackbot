@@ -87,7 +87,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onMounted, onUnmounted, watch } from 'vue'
+import { ref, nextTick, onMounted, onUnmounted } from 'vue'
 import { api } from '../composables/useApi'
 
 interface ChatMessage {
@@ -208,6 +208,7 @@ function connectSSE(sessionId: string) {
         flushStreamLines()
       } else if (data.type === 'error') {
         streamLines.value.push({ role: 'assistant', content: `오류: ${data.data}` })
+        flushStreamLines()
       } else if (data.type === 'file_changed') {
         emit('file-changed', data.data)
       }
