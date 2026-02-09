@@ -46,6 +46,12 @@ function ensureDefaultFiles(localDir: string): void {
   if (!fs.existsSync(rulesDir)) {
     fs.mkdirSync(rulesDir, { recursive: true });
   }
+
+  // skills/ 디렉토리
+  const skillsDir = path.join(localDir, 'skills');
+  if (!fs.existsSync(skillsDir)) {
+    fs.mkdirSync(skillsDir, { recursive: true });
+  }
 }
 
 // 자동 업데이트 확인 — git clone 설치 환경에서만 동작

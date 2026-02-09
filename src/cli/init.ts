@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { input, confirm } from '@inquirer/prompts';
 import chalk from 'chalk';
-import { getLocalDir, getToolsDir, getEnvPath } from '../config/paths.js';
+import { getLocalDir, getToolsDir, getSkillsDir, getEnvPath } from '../config/paths.js';
 import { logger } from '../utils/logger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -13,6 +13,7 @@ export async function initCommand(): Promise<void> {
   const cwd = process.cwd();
   const clackbotDir = getLocalDir(cwd);
   const toolsDir = getToolsDir(cwd);
+  const skillsDir = getSkillsDir(cwd);
 
   const templatesDir = path.resolve(__dirname, '../../templates');
 
@@ -73,6 +74,12 @@ export async function initCommand(): Promise<void> {
   if (!fs.existsSync(rulesDir)) {
     fs.mkdirSync(rulesDir, { recursive: true });
     logger.success('.clackbot/rules/ 디렉토리 생성');
+  }
+
+  // .clackbot/skills/ 디렉토리 생성
+  if (!fs.existsSync(skillsDir)) {
+    fs.mkdirSync(skillsDir, { recursive: true });
+    logger.success('.clackbot/skills/ 디렉토리 생성');
   }
 
   // memory.md 생성

@@ -52,6 +52,16 @@ export function getDbPath(cwd?: string): string {
   return path.join(getLocalDir(cwd), 'conversations.db');
 }
 
+/** rules 디렉토리 */
+export function getRulesDir(cwd?: string): string {
+  return path.join(getLocalDir(cwd), 'rules');
+}
+
+/** skills 디렉토리 */
+export function getSkillsDir(cwd?: string): string {
+  return path.join(getLocalDir(cwd), 'skills');
+}
+
 /** 플러그인 툴 디렉토리 (레거시 JSON) */
 export function getToolsDir(cwd?: string): string {
   return path.join(getLocalDir(cwd), 'tools');

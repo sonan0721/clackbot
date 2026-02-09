@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Router, type Request, type Response } from 'express';
-import { getLocalDir } from '../../config/paths.js';
+import { getLocalDir, getRulesDir } from '../../config/paths.js';
 import { Supervisor, type SupervisorEvent } from '../../agent/supervisor.js';
 
 // SSE + 사용자 입력 + 파일 편집 API — 슈퍼바이저 콘솔
@@ -155,6 +155,126 @@ router.put('/files/:slug', (req: Request, res: Response) => {
     res.json({ message: '파일이 저장되었습니다.' });
   } catch (error) {
     res.status(500).json({ error: '파일 저장 실패' });
+  }
+});
+
+// ─── rules/ 폴더 관리 엔드포인트 ───
+
+/** 디렉토리에서 .md 파일 재귀 탐색 */
+function scanMdFiles(dir: string, base: string): string[] {
+  if (!fs.existsSync(dir)) return [];
+  const results: string[] = [];
+  try {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        results.push(...scanMdFiles(fullPath, base));
+      } else if (entry.isFile() && entry.name.endsWith('.md')) {
+        results.push(path.relative(base, fullPath));
+      }
+    }
+  } catch {
+    // 읽기 실패 시 무시
+  }
+  return results.sort();
+}
+
+/** filename 인코딩: `/` → `--` (path traversal 방지) */
+function decodeRulesFilename(encoded: string): string | null {
+  // `--`를 `/`로 변환
+  const decoded = encoded.replace(/--/g, '/');
+  // path traversal 방지
+  if (decoded.includes('..') || decoded.startsWith('/')) return null;
+  // .md 확장자 강제
+  if (!decoded.endsWith('.md')) return null;
+  return decoded;
+}
+
+function resolveRulesPath(filename: string): string | null {
+  const decoded = decodeRulesFilename(filename);
+  if (!decoded) return null;
+  const rulesDir = getRulesDir();
+  const resolved = path.resolve(rulesDir, decoded);
+  // rules/ 디렉토리 내에 있는지 검증
+  if (!resolved.startsWith(path.resolve(rulesDir))) return null;
+  return resolved;
+}
+
+// GET /api/supervisor/rules — rules/ 내 .md 파일 목록
+router.get('/rules', (_req: Request, res: Response) => {
+  const rulesDir = getRulesDir();
+  const files = scanMdFiles(rulesDir, rulesDir);
+  res.json({
+    files: files.map(f => ({
+      filename: f.replace(/\//g, '--'),
+      path: f,
+    })),
+  });
+});
+
+// GET /api/supervisor/rules/:filename — 규칙 파일 내용 읽기
+router.get('/rules/:filename', (req: Request, res: Response) => {
+  const fullPath = resolveRulesPath(req.params.filename as string);
+  if (!fullPath) {
+    res.status(400).json({ error: '잘못된 파일 경로입니다.' });
+    return;
+  }
+
+  if (!fs.existsSync(fullPath)) {
+    res.json({ content: '', exists: false });
+    return;
+  }
+
+  try {
+    const content = fs.readFileSync(fullPath, 'utf-8');
+    res.json({ content, exists: true });
+  } catch {
+    res.status(500).json({ error: '파일 읽기 실패' });
+  }
+});
+
+// PUT /api/supervisor/rules/:filename — 규칙 파일 저장 (없으면 생성)
+router.put('/rules/:filename', (req: Request, res: Response) => {
+  const fullPath = resolveRulesPath(req.params.filename as string);
+  if (!fullPath) {
+    res.status(400).json({ error: '잘못된 파일 경로입니다.' });
+    return;
+  }
+
+  const { content } = req.body;
+  if (typeof content !== 'string') {
+    res.status(400).json({ error: 'content(문자열)가 필요합니다.' });
+    return;
+  }
+
+  try {
+    fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+    fs.writeFileSync(fullPath, content, 'utf-8');
+    res.json({ message: '파일이 저장되었습니다.' });
+  } catch {
+    res.status(500).json({ error: '파일 저장 실패' });
+  }
+});
+
+// DELETE /api/supervisor/rules/:filename — 규칙 파일 삭제
+router.delete('/rules/:filename', (req: Request, res: Response) => {
+  const fullPath = resolveRulesPath(req.params.filename as string);
+  if (!fullPath) {
+    res.status(400).json({ error: '잘못된 파일 경로입니다.' });
+    return;
+  }
+
+  if (!fs.existsSync(fullPath)) {
+    res.status(404).json({ error: '파일이 존재하지 않습니다.' });
+    return;
+  }
+
+  try {
+    fs.unlinkSync(fullPath);
+    res.json({ message: '파일이 삭제되었습니다.' });
+  } catch {
+    res.status(500).json({ error: '파일 삭제 실패' });
   }
 });
 

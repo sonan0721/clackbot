@@ -1,5 +1,4 @@
 import express from 'express';
-import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from '../config/index.js';
@@ -12,6 +11,7 @@ import consoleRouter from './api/console.js';
 import supervisorRouter from './api/supervisor.js';
 import pluginsRouter from './api/plugins.js';
 import slackRouter from './api/slack.js';
+import skillsRouter from './api/skills.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -53,27 +53,15 @@ export function createWebServer() {
   app.use('/api/supervisor', supervisorRouter);
   app.use('/api/plugins', pluginsRouter);
   app.use('/api/slack', slackRouter);
+  app.use('/api/skills', skillsRouter);
 
-  // 정적 파일 서빙 (대시보드 프론트엔드) — 캐시 비활성화
+  // 정적 파일 서빙 (Vite 빌드 출력)
   const publicDir = path.resolve(__dirname, 'public');
-  app.use(express.static(publicDir, {
-    etag: false,
-    lastModified: false,
-    setHeaders: (res) => {
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-      res.setHeader('Pragma', 'no-cache');
-      res.setHeader('Expires', '0');
-    },
-  }));
+  app.use(express.static(publicDir));
 
-  // SPA 라우팅 — index.html에 cache-busting 쿼리 주입
-  const startTime = Date.now();
+  // SPA 라우팅 — 모든 경로에서 index.html 반환
   app.get('*', (_req, res) => {
-    const indexPath = path.join(publicDir, 'index.html');
-    const html = fs.readFileSync(indexPath, 'utf-8')
-      .replace('/style.css', `/style.css?v=${startTime}`)
-      .replace('/app.js', `/app.js?v=${startTime}`);
-    res.type('html').send(html);
+    res.sendFile(path.join(publicDir, 'index.html'));
   });
 
   return app;
