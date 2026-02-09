@@ -1,23 +1,9 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { Command } from 'commander';
+import { APP_VERSION } from '../config/paths.js';
 import { initCommand } from './init.js';
 import { loginCommand } from './login.js';
 import { startCommand } from './start.js';
 import { doctorCommand } from './doctor.js';
-
-// package.json에서 버전 읽기 — 빌드 후 경로가 달라지므로 상위로 탐색
-function findPackageJson(): string {
-  let dir = path.dirname(fileURLToPath(import.meta.url));
-  while (dir !== path.dirname(dir)) {
-    const candidate = path.join(dir, 'package.json');
-    if (fs.existsSync(candidate)) return candidate;
-    dir = path.dirname(dir);
-  }
-  return path.resolve('package.json');
-}
-const pkg = JSON.parse(fs.readFileSync(findPackageJson(), 'utf-8'));
 
 // CLI 프로그램 정의
 const program = new Command();
@@ -25,7 +11,7 @@ const program = new Command();
 program
   .name('clackbot')
   .description('개인 로컬 Slack 비서 — Claude Code 기반 Slack 에이전트')
-  .version(pkg.version);
+  .version(APP_VERSION);
 
 // init — 스캐폴딩
 program

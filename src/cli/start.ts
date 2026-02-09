@@ -3,7 +3,7 @@ import path from 'node:path';
 import { execFileSync, type ExecFileSyncOptions } from 'node:child_process';
 import { config as loadEnv } from 'dotenv';
 import { loadConfig, saveConfig } from '../config/index.js';
-import { getLocalDir, getEnvPath } from '../config/paths.js';
+import { getLocalDir, getEnvPath, APP_VERSION } from '../config/paths.js';
 import { createSlackApp, startSlackApp } from '../slack/app.js';
 import { startWebServer } from '../web/server.js';
 import { initDatabase, closeDatabase } from '../store/conversations.js';
@@ -180,15 +180,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
     process.exit(1);
   }
 
-  // 버전 표시
-  let version = '?';
-  try {
-    const pkgPath = new URL('../../../package.json', import.meta.url);
-    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
-    version = pkg.version || '?';
-  } catch { /* 무시 */ }
-
-  logger.info(`Clackbot v${version}을 시작합니다...`);
+  logger.info(`Clackbot v${APP_VERSION}을 시작합니다...`);
   logger.blank();
 
   // 대화 DB 초기화

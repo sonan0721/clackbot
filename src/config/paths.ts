@@ -1,8 +1,31 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { fileURLToPath } from 'node:url';
 
 // .clackbot 디렉토리 경로 계산
 // 프로젝트 로컬(.clackbot/) 우선, 없으면 홈 디렉토리(~/.clackbot/)
+
+/** package.json을 상위로 탐색하여 찾기 */
+function findPackageJson(): string {
+  let dir = path.dirname(fileURLToPath(import.meta.url));
+  while (dir !== path.dirname(dir)) {
+    const candidate = path.join(dir, 'package.json');
+    if (fs.existsSync(candidate)) return candidate;
+    dir = path.dirname(dir);
+  }
+  return path.resolve('package.json');
+}
+
+/** 앱 버전 (package.json에서 읽음) */
+export const APP_VERSION: string = (() => {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(findPackageJson(), 'utf-8'));
+    return pkg.version || '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+})();
 
 /** 프로젝트 로컬 .clackbot 디렉토리 */
 export function getLocalDir(cwd: string = process.cwd()): string {
