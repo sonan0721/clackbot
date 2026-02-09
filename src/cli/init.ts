@@ -15,7 +15,7 @@ export async function initCommand(): Promise<void> {
   const toolsDir = getToolsDir(cwd);
   const templatesDir = path.resolve(__dirname, '../../templates');
 
-  logger.info('Clackbot 프로젝트를 초기화합니다...');
+  logger.info('프로젝트를 초기화합니다...');
   logger.blank();
 
   // .clackbot/ 디렉토리 생성
@@ -62,7 +62,7 @@ export async function initCommand(): Promise<void> {
     if (fs.existsSync(claudeMdSrc)) {
       fs.copyFileSync(claudeMdSrc, claudeMdDest);
     } else {
-      fs.writeFileSync(claudeMdDest, '# Clackbot 규칙\n\n이 파일을 수정하여 봇의 동작을 커스터마이즈하세요.\n', 'utf-8');
+      fs.writeFileSync(claudeMdDest, '# 봇 규칙\n\n이 파일을 수정하여 봇의 동작을 커스터마이즈하세요.\n', 'utf-8');
     }
     logger.success('.clackbot/CLAUDE.md 생성');
   }
@@ -77,7 +77,7 @@ export async function initCommand(): Promise<void> {
   // memory.md 생성
   const memoryPath = path.join(clackbotDir, 'memory.md');
   if (!fs.existsSync(memoryPath)) {
-    fs.writeFileSync(memoryPath, '# Clackbot 메모리\n\n', 'utf-8');
+    fs.writeFileSync(memoryPath, '# 메모리\n\n', 'utf-8');
     logger.success('.clackbot/memory.md 생성');
   }
 

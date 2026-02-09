@@ -7,7 +7,7 @@ import { getMemoryPath } from '../../../config/paths.js';
 
 export const memoryReadTool = tool(
   'memory_read',
-  'Clackbot 메모리 파일(.clackbot/memory.md)을 읽습니다',
+  '메모리 파일(.clackbot/memory.md)을 읽습니다',
   {},
   async () => {
     const memoryPath = getMemoryPath();
@@ -33,7 +33,7 @@ export const memoryReadTool = tool(
 
 export const memoryWriteTool = tool(
   'memory_write',
-  'Clackbot 메모리 파일(.clackbot/memory.md)에 내용을 추가합니다',
+  '메모리 파일(.clackbot/memory.md)에 내용을 추가합니다',
   {
     content: z.string().describe('추가할 메모리 내용'),
   },
@@ -43,7 +43,7 @@ export const memoryWriteTool = tool(
     try {
       const existing = fs.existsSync(memoryPath)
         ? fs.readFileSync(memoryPath, 'utf-8')
-        : '# Clackbot 메모리\n\n';
+        : '# 메모리\n\n';
 
       const updated = existing.trimEnd() + '\n\n' + args.content + '\n';
       fs.writeFileSync(memoryPath, updated, 'utf-8');

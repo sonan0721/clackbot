@@ -15,7 +15,7 @@ export async function doctorCommand(): Promise<void> {
   const cwd = process.cwd();
   const results: CheckResult[] = [];
 
-  logger.info('Clackbot 환경 진단을 시작합니다...');
+  logger.info('환경 진단을 시작합니다...');
   logger.blank();
 
   // 1. Node.js 버전 확인

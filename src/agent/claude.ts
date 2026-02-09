@@ -2,6 +2,7 @@ import { query, type SDKMessage } from '@anthropic-ai/claude-code';
 import { buildSystemPrompt } from './systemPrompt.js';
 import { createCanUseTool } from './permissions.js';
 import { getMcpServers } from './tools/loader.js';
+import { loadConfig } from '../config/index.js';
 import { logger } from '../utils/logger.js';
 
 // Claude Agent SDK query() 래퍼
@@ -95,7 +96,9 @@ export async function queryAgent(params: QueryParams): Promise<QueryResult> {
   const mcpServers = getMcpServers(cwd);
 
   // 역할 기반 권한
-  const canUseTool = createCanUseTool(isOwner);
+  const config = loadConfig();
+  const botName = config.slack?.botName || '비서봇';
+  const canUseTool = createCanUseTool(isOwner, botName);
 
   // Agent SDK 호출
   const toolsUsed: string[] = [];

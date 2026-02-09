@@ -319,8 +319,9 @@ export function buildSystemPrompt(cwd: string, context: 'dm' | 'mention' = 'ment
     personalityPrompt = PERSONALITY_PRESETS[preset] ?? PERSONALITY_PRESETS.istj;
   }
 
-  // 기본 Clackbot 역할 정의
-  parts.push(`당신은 Clackbot이며, 사용자의 개인 Slack 비서입니다.
+  // 기본 역할 정의
+  const botName = config.slack?.botName || '비서봇';
+  parts.push(`당신은 ${botName}이며, 사용자의 개인 Slack 비서입니다.
 사용자를 대신하여 Slack 메시지를 작성하고 업무를 보조합니다.
 
 ${personalityPrompt}`);
@@ -363,7 +364,7 @@ ${personalityPrompt}`);
 
   // 메모리 읽기 (.clackbot/memory.md)
   const memory = tryReadFile(path.join(cwd, 'memory.md'));
-  if (memory && memory.trim() !== '# Clackbot 메모리') {
+  if (memory && memory.trim() !== '# 메모리' && memory.trim() !== `# ${botName} 메모리`) {
     parts.push(`\n---\n# 메모리\n${memory}`);
   }
 

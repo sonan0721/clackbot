@@ -36,7 +36,7 @@ function ensureDefaultFiles(localDir: string): void {
     if (fs.existsSync(templatePath)) {
       fs.copyFileSync(templatePath, claudeMd);
     } else {
-      fs.writeFileSync(claudeMd, '# Clackbot 규칙\n\n이 파일을 수정하여 봇의 동작을 커스터마이즈하세요.\n', 'utf-8');
+      fs.writeFileSync(claudeMd, '# 봇 규칙\n\n이 파일을 수정하여 봇의 동작을 커스터마이즈하세요.\n', 'utf-8');
     }
     logger.info('.clackbot/CLAUDE.md 생성됨');
   }
@@ -214,7 +214,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
     process.exit(1);
   }
 
-  logger.info(`Clackbot v${APP_VERSION}을 시작합니다...`);
+  logger.info(`${config.slack?.botName || 'Clackbot'} v${APP_VERSION}을 시작합니다...`);
   logger.blank();
 
   // 대화 DB 초기화
@@ -304,7 +304,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
             : '없음';
 
           const startupMsg = [
-            `:white_check_mark: *Clackbot v${APP_VERSION} 시작됨*`,
+            `:white_check_mark: *${botName} v${APP_VERSION} 시작됨*`,
             '',
             '*현재 설정*',
             `• 접근 모드: \`${config.accessMode}\``,
@@ -338,7 +338,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
     // Graceful shutdown
     const shutdown = async () => {
       logger.blank();
-      logger.info('Clackbot을 종료합니다...');
+      logger.info('봇을 종료합니다...');
 
       try {
         await app.stop();

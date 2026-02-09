@@ -28,13 +28,13 @@ router.get('/', (_req, res) => {
     },
     {
       name: 'memory_read',
-      description: 'Clackbot 메모리를 읽습니다',
+      description: '메모리를 읽습니다',
       type: 'builtin' as const,
       status: 'active' as const,
     },
     {
       name: 'memory_write',
-      description: 'Clackbot 메모리에 내용을 추가합니다',
+      description: '메모리에 내용을 추가합니다',
       type: 'builtin' as const,
       status: 'active' as const,
     },

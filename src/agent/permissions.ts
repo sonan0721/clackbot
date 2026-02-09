@@ -25,7 +25,7 @@ const WRITE_TOOLS = new Set([
  * - Owner: 모든 도구 허용 (Read, Write, Edit, Bash, MCP 등)
  * - 비Owner: 모든 도구 차단 (일반 대화만 가능)
  */
-export function createCanUseTool(isOwner: boolean): CanUseTool {
+export function createCanUseTool(isOwner: boolean, botName = '비서봇'): CanUseTool {
   return async (
     toolName,
     input,
@@ -38,7 +38,7 @@ export function createCanUseTool(isOwner: boolean): CanUseTool {
     // 비Owner: 모든 도구 차단
     return {
       behavior: 'deny',
-      message: `Clackbot: 도구 사용은 Owner에게만 허용됩니다.`,
+      message: `${botName}: 도구 사용은 Owner에게만 허용됩니다.`,
     };
   };
 }

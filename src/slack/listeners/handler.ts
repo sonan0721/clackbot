@@ -3,6 +3,7 @@ import { queryAgent, type Attachment } from '../../agent/claude.js';
 import { sessionManager } from '../../session/manager.js';
 import { saveConversation } from '../../store/conversations.js';
 import { getLocalDir } from '../../config/paths.js';
+import { loadConfig } from '../../config/index.js';
 import { truncateText } from '../../utils/slackFormat.js';
 import { logger } from '../../utils/logger.js';
 
@@ -32,11 +33,13 @@ export async function handleMessage(params: HandleMessageParams): Promise<void> 
   } = params;
 
   // "생각 중..." 메시지 전송
+  const handlerConfig = loadConfig();
+  const thinkingMessage = handlerConfig.personality?.thinkingMessage || '생각 중...';
   let thinkingTs: string | undefined;
   try {
     const thinkingMsg = await client.chat.postMessage({
       channel: channelId,
-      text: ':hourglass_flowing_sand: 생각 중...',
+      text: `:hourglass_flowing_sand: ${thinkingMessage}`,
       ...(replyInChannel ? {} : { thread_ts: threadTs }),
     });
     thinkingTs = thinkingMsg.ts as string | undefined;
@@ -59,7 +62,7 @@ export async function handleMessage(params: HandleMessageParams): Promise<void> 
 
     const flushThinkingUpdate = async (status: string) => {
       if (!thinkingTs) return;
-      const thinkingText = `:hourglass_flowing_sand: 생각 중...\n\n\`\`\`\n${status}\n\`\`\``;
+      const thinkingText = `:hourglass_flowing_sand: ${thinkingMessage}\n\n\`\`\`\n${status}\n\`\`\``;
       try {
         await client.chat.update({
           channel: channelId,

@@ -37,6 +37,7 @@ export const ConfigSchema = z.object({
       'custom',
     ]).default('istj'),
     customPrompt: z.string().optional(),
+    thinkingMessage: z.string().default('생각 중...'),
   }).default({}),
 
   // MCP 서버 설정 (플러그인 설치 시 저장)
