@@ -72,8 +72,9 @@ export async function handleMessage(params: HandleMessageParams): Promise<void> 
     // 생각 중 메시지 실시간 업데이트 (channel 모드는 도구 없으므로 스킵)
     let onProgress: ((status: string) => void) | undefined;
     let updateTimer: ReturnType<typeof setTimeout> | null = null;
+    const showProgress = handlerConfig.personality?.showProgress !== false;
 
-    if (mode !== 'channel') {
+    if (mode !== 'channel' && showProgress) {
       let lastUpdateTime = 0;
       let pendingStatus: string | null = null;
 

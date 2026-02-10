@@ -58,6 +58,13 @@
         />
         <div style="margin-top: 4px; font-size: 12px; color: var(--text-muted);">응답 생성 중 표시되는 메시지 (기본: 생각 중...)</div>
       </div>
+      <div class="form-group">
+        <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+          <input type="checkbox" v-model="showProgress" />
+          진행 과정 표시
+        </label>
+        <div style="margin-top: 4px; font-size: 12px; color: var(--text-muted);">체크 시 응답 생성 중 도구 사용 상태를 실시간으로 표시합니다.</div>
+      </div>
     </div>
 
     <div class="card">
@@ -128,6 +135,7 @@ import type { ConfigResponse, SlackUser } from '../types/api'
 const preset = ref<string>('istj')
 const customPrompt = ref('')
 const thinkingMessage = ref('생각 중...')
+const showProgress = ref(true)
 const ownerUserId = ref('')
 const maxMessages = ref(50)
 const timeoutMinutes = ref(30)
@@ -171,6 +179,7 @@ onMounted(async () => {
     preset.value = config.personality?.preset || 'istj'
     customPrompt.value = config.personality?.customPrompt || ''
     thinkingMessage.value = config.personality?.thinkingMessage || '생각 중...'
+    showProgress.value = config.personality?.showProgress !== false
     ownerUserId.value = config.ownerUserId || ''
     maxMessages.value = config.session?.maxMessages || 50
     timeoutMinutes.value = config.session?.timeoutMinutes || 30
@@ -215,6 +224,7 @@ async function saveSettings() {
       preset: preset.value,
       ...(preset.value === 'custom' ? { customPrompt: customPrompt.value } : {}),
       thinkingMessage: thinkingMessage.value || '생각 중...',
+      showProgress: showProgress.value,
     },
   }
 

@@ -186,8 +186,7 @@ export async function queryAgent(params: QueryParams): Promise<QueryResult> {
               // 텍스트의 첫 줄을 활동으로 기록 (80자 제한)
               const firstLine = block.text.split('\n')[0].trim();
               if (firstLine) {
-                const truncated = firstLine.length > 80 ? firstLine.slice(0, 77) + '...' : firstLine;
-                pushActivity(`💬 ${truncated}`);
+                pushActivity(`💬 ${firstLine}`);
               }
             }
             // 도구 사용 추적 + 진행 상태 보고

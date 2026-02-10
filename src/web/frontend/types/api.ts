@@ -98,6 +98,7 @@ export interface ConfigResponse {
     preset: string
     customPrompt?: string
     thinkingMessage?: string
+    showProgress?: boolean
   }
   slack: {
     botName?: string
