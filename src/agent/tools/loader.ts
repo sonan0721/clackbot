@@ -196,15 +196,11 @@ function pluginToolToMcpTool(pluginName: string, toolDef: PluginToolDefinition) 
   );
 }
 
-// stdio MCP 서버 설정 타입
-interface StdioMcpServerConfig {
-  type: 'stdio';
-  command: string;
-  args: string[];
-  env?: Record<string, string>;
-}
-
-export type McpServerConfig = McpSdkServerConfigWithInstance | StdioMcpServerConfig;
+export type McpServerConfig =
+  | McpSdkServerConfigWithInstance
+  | { type: 'stdio'; command: string; args: string[]; env?: Record<string, string> }
+  | { type: 'sse'; url: string; headers?: Record<string, string> }
+  | { type: 'http'; url: string; headers?: Record<string, string> };
 
 /** 모든 MCP 서버 설정 반환 (내장 + config mcpServers + 플러그인 JSON) */
 export function getMcpServers(cwd?: string): Record<string, McpServerConfig> {
@@ -217,16 +213,35 @@ export function getMcpServers(cwd?: string): Record<string, McpServerConfig> {
     tools: [slackPostTool, slackReadChannelTool, slackSendDmTool, memoryReadTool, memoryWriteTool],
   });
 
-  // config.mcpServers에서 stdio MCP 서버 로드
+  // config.mcpServers에서 MCP 서버 로드 (stdio/sse/http)
   const config = loadConfig(cwd);
   if (config.mcpServers) {
     for (const [name, serverConfig] of Object.entries(config.mcpServers)) {
-      servers[name] = {
-        type: 'stdio' as const,
-        command: serverConfig.command,
-        args: serverConfig.args,
-        ...(serverConfig.env ? { env: serverConfig.env } : {}),
-      };
+      switch (serverConfig.type) {
+        case 'sse':
+          servers[name] = {
+            type: 'sse' as const,
+            url: serverConfig.url,
+            ...(serverConfig.headers ? { headers: serverConfig.headers } : {}),
+          };
+          break;
+        case 'http':
+          servers[name] = {
+            type: 'http' as const,
+            url: serverConfig.url,
+            ...(serverConfig.headers ? { headers: serverConfig.headers } : {}),
+          };
+          break;
+        case 'stdio':
+        default:
+          servers[name] = {
+            type: 'stdio' as const,
+            command: serverConfig.command,
+            args: serverConfig.args,
+            ...(serverConfig.env ? { env: serverConfig.env } : {}),
+          };
+          break;
+      }
     }
   }
 

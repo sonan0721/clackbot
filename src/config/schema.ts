@@ -38,11 +38,27 @@ export const ConfigSchema = z.object({
   }).default({}),
 
   // MCP 서버 설정 (플러그인 설치 시 저장)
-  mcpServers: z.record(z.object({
-    command: z.string(),
-    args: z.array(z.string()).default([]),
-    env: z.record(z.string()).optional(),
-  })).default({}),
+  mcpServers: z.record(z.union([
+    // SSE 타입
+    z.object({
+      type: z.literal('sse'),
+      url: z.string(),
+      headers: z.record(z.string()).optional(),
+    }),
+    // HTTP 타입
+    z.object({
+      type: z.literal('http'),
+      url: z.string(),
+      headers: z.record(z.string()).optional(),
+    }),
+    // stdio 타입 (기본값 — type 없는 기존 config도 호환)
+    z.object({
+      type: z.literal('stdio').default('stdio'),
+      command: z.string(),
+      args: z.array(z.string()).default([]),
+      env: z.record(z.string()).optional(),
+    }),
+  ])).default({}),
 });
 
 export type ClackbotConfig = z.infer<typeof ConfigSchema>;

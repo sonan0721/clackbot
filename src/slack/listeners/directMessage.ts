@@ -49,7 +49,7 @@ export function registerDirectMessage(app: App): void {
     }
 
     // 스레드 컨텍스트 조회
-    let threadMessages: Array<{ user: string; text: string }> = [];
+    let threadMessages: Array<{ user: string; text: string; botId?: string }> = [];
     const originalThreadTs = String(evt.thread_ts ?? '');
 
     if (originalThreadTs) {
@@ -65,6 +65,7 @@ export function registerDirectMessage(app: App): void {
           .map(m => ({
             user: m.user ?? 'unknown',
             text: m.text ?? '',
+            botId: (m as unknown as Record<string, unknown>).bot_id as string | undefined,
           }));
       } catch (error) {
         logger.warn(`스레드 컨텍스트 조회 실패: ${error}`);

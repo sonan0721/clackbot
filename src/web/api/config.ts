@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { loadConfig, saveConfig } from '../../config/index.js';
+import { ConfigSchema } from '../../config/schema.js';
 
 // GET/PUT /api/config — 설정 조회/변경
 
@@ -80,7 +81,8 @@ router.put('/', (req, res) => {
     }
 
     if (updates.mcpServers !== undefined) {
-      config.mcpServers = updates.mcpServers;
+      const validated = ConfigSchema.shape.mcpServers.parse(updates.mcpServers);
+      config.mcpServers = validated;
     }
 
     saveConfig(config);

@@ -38,11 +38,29 @@ export interface BuiltinTool {
   description: string
 }
 
-export interface McpServer {
+export interface McpServerStdio {
   name: string
+  serverType: 'stdio'
   command: string
   args: string[]
+  env: string[]
 }
+
+export interface McpServerSSE {
+  name: string
+  serverType: 'sse'
+  url: string
+  headers: string[]
+}
+
+export interface McpServerHTTP {
+  name: string
+  serverType: 'http'
+  url: string
+  headers: string[]
+}
+
+export type McpServer = McpServerStdio | McpServerSSE | McpServerHTTP
 
 export interface PluginTool {
   name: string
@@ -52,9 +70,19 @@ export interface PluginTool {
   missingEnvVars: string[]
 }
 
+export interface PluginMcpServer {
+  name: string
+  displayName: string
+  command: string
+  args: string[]
+  env: string[]
+  hasPage: boolean
+}
+
 export interface ToolsResponse {
   builtin: BuiltinTool[]
   mcpServers: McpServer[]
+  pluginMcpServers: PluginMcpServer[]
   plugins: PluginTool[]
   total: number
 }
@@ -69,6 +97,7 @@ export interface ConfigResponse {
   personality: {
     preset: string
     customPrompt?: string
+    thinkingMessage?: string
   }
   slack: {
     botName?: string
@@ -77,7 +106,11 @@ export interface ConfigResponse {
     botToken?: string
     appToken?: string
   }
-  mcpServers: Record<string, { command: string; args: string[]; env?: Record<string, string> }>
+  mcpServers: Record<string,
+    | { type: 'stdio'; command: string; args: string[]; env?: Record<string, string> }
+    | { type: 'sse'; url: string; headers?: Record<string, string> }
+    | { type: 'http'; url: string; headers?: Record<string, string> }
+  >
 }
 
 export interface SlackUser {

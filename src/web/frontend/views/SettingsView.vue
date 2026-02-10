@@ -47,6 +47,17 @@
           placeholder="봇의 성격과 응답 스타일을 자유롭게 정의하세요..."
         ></textarea>
       </div>
+      <div class="form-group">
+        <label>생각 중 메시지</label>
+        <input
+          v-model="thinkingMessage"
+          type="text"
+          class="form-control"
+          style="max-width: 360px;"
+          placeholder="생각 중..."
+        />
+        <div style="margin-top: 4px; font-size: 12px; color: var(--text-muted);">응답 생성 중 표시되는 메시지 (기본: 생각 중...)</div>
+      </div>
     </div>
 
     <div class="card">
@@ -116,6 +127,7 @@ import type { ConfigResponse, SlackUser } from '../types/api'
 
 const preset = ref<string>('istj')
 const customPrompt = ref('')
+const thinkingMessage = ref('생각 중...')
 const ownerUserId = ref('')
 const maxMessages = ref(50)
 const timeoutMinutes = ref(30)
@@ -158,6 +170,7 @@ onMounted(async () => {
     const config = await api<ConfigResponse>('/api/config')
     preset.value = config.personality?.preset || 'istj'
     customPrompt.value = config.personality?.customPrompt || ''
+    thinkingMessage.value = config.personality?.thinkingMessage || '생각 중...'
     ownerUserId.value = config.ownerUserId || ''
     maxMessages.value = config.session?.maxMessages || 50
     timeoutMinutes.value = config.session?.timeoutMinutes || 30
@@ -201,6 +214,7 @@ async function saveSettings() {
     personality: {
       preset: preset.value,
       ...(preset.value === 'custom' ? { customPrompt: customPrompt.value } : {}),
+      thinkingMessage: thinkingMessage.value || '생각 중...',
     },
   }
 

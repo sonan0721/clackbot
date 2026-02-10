@@ -48,7 +48,7 @@ export interface Attachment {
 export interface QueryParams {
   prompt: string;
   cwd: string;
-  threadMessages?: Array<{ user: string; text: string }>;
+  threadMessages?: Array<{ user: string; text: string; botId?: string }>;
   sessionId: string;
   resumeId?: string;
   isOwner: boolean;
@@ -74,11 +74,14 @@ export async function queryAgent(params: QueryParams): Promise<QueryResult> {
   // mode → 시스템 프롬프트 컨텍스트 매핑
   const promptContext = mode === 'channel' ? 'channel' : mode === 'dm' ? 'dm' : 'mention' as const;
 
-  // 스레드 컨텍스트를 프롬프트에 포함
+  // 스레드 컨텍스트를 프롬프트에 포함 (앱/사용자 구분)
   let fullPrompt = prompt;
   if (threadMessages && threadMessages.length > 0) {
     const threadContext = threadMessages
-      .map(m => `[${m.user}]: ${m.text}`)
+      .map(m => {
+        const role = m.botId ? `🤖 앱(${m.user})` : `👤 사용자(${m.user})`;
+        return `[${role}]: ${m.text}`;
+      })
       .join('\n');
     fullPrompt = `스레드 대화 컨텍스트:\n${threadContext}\n\n현재 메시지:\n${prompt}`;
   }

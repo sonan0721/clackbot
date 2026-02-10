@@ -185,6 +185,9 @@ function listMcpServers(config: ClackbotConfig): string {
   return names
     .map((name) => {
       const s = servers[name];
+      if (s.type === 'sse' || s.type === 'http') {
+        return `\`${name}\` (${s.type}: ${s.url})`;
+      }
       return `\`${name}\` (${s.command} ${s.args.join(' ')})`;
     })
     .join(', ');
@@ -335,7 +338,13 @@ export function buildSystemPrompt(cwd: string, context: 'dm' | 'mention' | 'chan
     parts.push(`당신은 ${botName}이며, 사용자의 개인 Slack 비서입니다.
 사용자를 대신하여 Slack 메시지를 작성하고 업무를 보조합니다.
 
-${personalityPrompt}`);
+${personalityPrompt}
+
+## 메시지 구분 규칙
+스레드 대화 컨텍스트에서 메시지는 다음과 같이 구분됩니다:
+- \`[🤖 앱(...)]\`: 봇/앱이 보낸 메시지입니다 (당신 포함, 다른 봇/앱 포함).
+- \`[👤 사용자(...)]\`: 사람이 보낸 메시지입니다.
+- \`현재 메시지\` 아래의 내용이 지금 응답해야 할 최신 요청입니다.`);
   }
 
   // 컨텍스트별 규칙

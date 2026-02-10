@@ -6,14 +6,42 @@
       <h2>설치된 MCP 서버 ({{ mcpServers.length }}개)</h2>
       <table class="table" style="margin-top: 12px;">
         <thead>
-          <tr><th>이름</th><th>명령어</th><th>상태</th><th>관리</th></tr>
+          <tr><th>이름</th><th>타입</th><th>연결 정보</th><th>상태</th><th>관리</th></tr>
         </thead>
         <tbody>
           <tr v-for="s in mcpServers" :key="s.name">
             <td><strong>{{ s.name }}</strong></td>
-            <td><code>{{ s.command }} {{ s.args.join(' ') }}</code></td>
+            <td>
+              <span v-if="s.serverType === 'sse'" class="badge badge-sse">SSE</span>
+              <span v-else-if="s.serverType === 'http'" class="badge badge-http">HTTP</span>
+              <span v-else class="badge badge-stdio">stdio</span>
+            </td>
+            <td>
+              <template v-if="s.serverType === 'sse' || s.serverType === 'http'">
+                <code>{{ s.url }}</code>
+              </template>
+              <template v-else>
+                <code>{{ s.command }} {{ s.args.join(' ') }}</code>
+              </template>
+            </td>
             <td><span class="badge badge-active">활성</span></td>
             <td><button class="btn btn-danger" style="font-size: 12px; padding: 4px 8px;" @click="removeMcp(s.name)">삭제</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div v-if="pluginMcpServers.length > 0" class="card">
+      <h2>플러그인 MCP 서버 ({{ pluginMcpServers.length }}개)</h2>
+      <table class="table" style="margin-top: 12px;">
+        <thead>
+          <tr><th>이름</th><th>명령어</th><th>상태</th></tr>
+        </thead>
+        <tbody>
+          <tr v-for="s in pluginMcpServers" :key="s.name">
+            <td><strong>{{ s.displayName }}</strong></td>
+            <td><code>{{ s.command }} {{ s.args.join(' ') }}</code></td>
+            <td><span class="badge badge-active">활성</span></td>
           </tr>
         </tbody>
       </table>
@@ -69,10 +97,11 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { api } from '../composables/useApi'
-import type { ToolsResponse, BuiltinTool, McpServer, PluginTool, ConfigResponse } from '../types/api'
+import type { ToolsResponse, BuiltinTool, McpServer, PluginTool, PluginMcpServer, ConfigResponse } from '../types/api'
 
 const builtin = ref<BuiltinTool[]>([])
 const mcpServers = ref<McpServer[]>([])
+const pluginMcpServers = ref<PluginMcpServer[]>([])
 const plugins = ref<PluginTool[]>([])
 
 async function loadTools() {
@@ -80,10 +109,12 @@ async function loadTools() {
     const data = await api<ToolsResponse>('/api/tools')
     builtin.value = data.builtin
     mcpServers.value = data.mcpServers
+    pluginMcpServers.value = data.pluginMcpServers ?? []
     plugins.value = data.plugins
   } catch {
     builtin.value = []
     mcpServers.value = []
+    pluginMcpServers.value = []
     plugins.value = []
   }
 }

@@ -17,7 +17,7 @@ export interface HandleMessageParams {
   userId: string;
   channelId: string;
   threadTs: string;
-  threadMessages: Array<{ user: string; text: string }>;
+  threadMessages: Array<{ user: string; text: string; botId?: string }>;
   say: (params: { text: string; thread_ts?: string }) => Promise<unknown>;
   client: WebClient;
   isOwner: boolean;

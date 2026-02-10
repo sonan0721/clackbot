@@ -40,15 +40,19 @@ router.get('/', (_req, res) => {
     },
   ];
 
-  // config.mcpServers에서 설치된 MCP 서버
-  const mcpServers = Object.entries(config.mcpServers || {}).map(([name, server]) => ({
-    name,
-    command: server.command,
-    args: server.args,
-    env: server.env ? Object.keys(server.env) : [],
-    type: 'mcp' as const,
-    status: 'active' as const,
-  }));
+  // config.mcpServers에서 설치된 MCP 서버 (stdio/sse/http)
+  const mcpServers = Object.entries(config.mcpServers || {}).map(([name, server]) => {
+    const base = { name, type: 'mcp' as const, status: 'active' as const };
+    switch (server.type) {
+      case 'sse':
+        return { ...base, serverType: 'sse' as const, url: server.url, headers: server.headers ? Object.keys(server.headers) : [] };
+      case 'http':
+        return { ...base, serverType: 'http' as const, url: server.url, headers: server.headers ? Object.keys(server.headers) : [] };
+      case 'stdio':
+      default:
+        return { ...base, serverType: 'stdio' as const, command: server.command, args: server.args, env: server.env ? Object.keys(server.env) : [] };
+    }
+  });
 
   // 플러그인 JSON 도구 (하위 호환)
   const plugins = loadPluginTools(toolsDir);
