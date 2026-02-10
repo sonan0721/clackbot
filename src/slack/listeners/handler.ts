@@ -42,7 +42,7 @@ export async function handleMessage(params: HandleMessageParams): Promise<void> 
   try {
     const thinkingMsg = await client.chat.postMessage({
       channel: channelId,
-      text: `:hourglass_flowing_sand: ${thinkingMessage}`,
+      text: thinkingMessage,
       ...(replyInChannel ? {} : { thread_ts: threadTs }),
     });
     thinkingTs = thinkingMsg.ts as string | undefined;
@@ -79,7 +79,7 @@ export async function handleMessage(params: HandleMessageParams): Promise<void> 
 
       const flushThinkingUpdate = async (status: string) => {
         if (!thinkingTs) return;
-        const thinkingText = `:hourglass_flowing_sand: ${thinkingMessage}\n\n\`\`\`\n${status}\n\`\`\``;
+        const thinkingText = `${thinkingMessage}\n\n\`\`\`\n${status}\n\`\`\``;
         try {
           await client.chat.update({
             channel: channelId,
