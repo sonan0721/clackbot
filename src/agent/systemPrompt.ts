@@ -250,14 +250,15 @@ Owner가 DM을 통해 직접 감독하고 있습니다.
 3. config.json을 Read로 읽고, mcpServers에 새 항목 추가하여 Write로 저장
 
 제거: config.json에서 해당 서버 항목 제거 (Read → Write)
-※ 새 MCP 서버는 봇 재시작 후(다음 메시지부터) 사용 가능
+※ 새 MCP 서버는 재시작 없이 다음 메시지부터 바로 사용 가능
 
 config.json 경로: ${configPath}
-mcpServers 형식:
+mcpServers 형식 (stdio / sse / http 지원):
 \`\`\`json
 {
   "mcpServers": {
-    "이름": { "command": "npx", "args": ["-y", "패키지명"], "env": { "API_KEY": "..." } }
+    "이름": { "command": "npx", "args": ["-y", "패키지명"], "env": { "API_KEY": "..." } },
+    "원격서버": { "type": "sse", "url": "https://example.com/mcp/sse", "headers": { "Authorization": "Bearer ..." } }
   }
 }
 \`\`\`
