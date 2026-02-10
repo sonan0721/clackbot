@@ -135,7 +135,28 @@ export async function queryAgent(params: QueryParams): Promise<QueryResult> {
       onProgress?.(activities.join('\n'));
     };
 
+    // MCP 서버 연결 실패 추적
+    const failedServers: Array<{ name: string; status: string }> = [];
+
     for await (const message of q) {
+      // system init 메시지에서 MCP 서버 연결 상태 캡처
+      if (message.type === 'system') {
+        const sysMsg = message as SDKMessage & {
+          subtype?: string;
+          mcp_servers?: Array<{ name: string; status: string }>;
+        };
+        if (sysMsg.subtype === 'init' && sysMsg.mcp_servers) {
+          for (const server of sysMsg.mcp_servers) {
+            if (server.status === 'connected') {
+              logger.info(`MCP 서버 연결 성공: ${server.name}`);
+            } else {
+              logger.warn(`MCP 서버 연결 실패: ${server.name} (${server.status})`);
+              failedServers.push(server);
+            }
+          }
+        }
+      }
+
       // 결과 메시지에서 최종 텍스트 추출
       if (message.type === 'result') {
         const resultMsg = message as SDKMessage & { subtype?: string; result?: string; session_id?: string };
@@ -178,6 +199,12 @@ export async function queryAgent(params: QueryParams): Promise<QueryResult> {
           }
         }
       }
+    }
+
+    // 연결 실패한 MCP 서버 요약 로깅
+    if (failedServers.length > 0) {
+      const names = failedServers.map(s => `${s.name}(${s.status})`).join(', ');
+      logger.warn(`MCP 서버 연결 실패 요약: ${names}`);
     }
   } catch (error) {
     logger.error(`Agent SDK 호출 실패: ${error instanceof Error ? error.message : String(error)}`);

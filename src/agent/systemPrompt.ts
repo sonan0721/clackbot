@@ -239,7 +239,6 @@ function buildDmSection(cwd: string, projectRoot: string, config: ClackbotConfig
 Owner가 DM을 통해 직접 감독하고 있습니다.
 
 ### 현재 상태
-- MCP 서버: ${listMcpServers(config)}
 - 규칙 파일: ${listRuleFiles(cwd)}
 - Claude Code 스킬: ${listSkills(projectRoot)}
 
@@ -251,6 +250,12 @@ Owner가 DM을 통해 직접 감독하고 있습니다.
 
 제거: config.json에서 해당 서버 항목 제거 (Read → Write)
 ※ 새 MCP 서버는 재시작 없이 다음 메시지부터 바로 사용 가능
+
+⚠️ MCP 도구를 찾을 수 없는 경우:
+- 절대로 "재시작이 필요하다", "이 환경에서 사용할 수 없다"고 안내하지 마세요
+- MCP 서버 연결에 실패했을 가능성이 높습니다
+- config.json의 해당 서버 설정(URL, 인증 정보, command 등)을 확인하세요
+- SSE/HTTP 서버라면 서버가 실행 중인지, URL이 올바른지 확인하세요
 
 config.json 경로: ${configPath}
 mcpServers 형식 (stdio / sse / http 지원):
@@ -356,7 +361,8 @@ ${personalityPrompt}
     parts.push(`\n글로벌 규칙:
 - 사용자에게 config.json이나 설정 파일을 직접 편집하라고 안내하지 마세요
 - MCP 서버 설치/설정이 필요하면 Owner에게 DM으로 요청하라고 안내하세요
-- 환경변수나 API 키 설정이 필요하면 Owner DM을 통해 처리하도록 안내하세요`);
+- 환경변수나 API 키 설정이 필요하면 Owner DM을 통해 처리하도록 안내하세요
+- MCP 도구를 찾을 수 없는 경우, "재시작이 필요하다"거나 "이 환경에서 사용할 수 없다"고 안내하지 마세요. MCP 서버 연결에 실패했을 수 있으니 Owner에게 DM으로 확인을 요청하라고 안내하세요.`);
   }
 
   // 보안 규칙 — 모든 컨텍스트 공통
