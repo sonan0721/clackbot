@@ -38,7 +38,13 @@ export const ConfigSchema = z.object({
   }).default({}),
 
   // MCP 서버 설정 (플러그인 설치 시 저장)
-  mcpServers: z.record(z.union([
+  mcpServers: z.record(z.preprocess((val) => {
+    // type 없이 url만 있으면 sse로 추론
+    if (val && typeof val === 'object' && 'url' in val && !('type' in val)) {
+      return { ...val as Record<string, unknown>, type: 'sse' };
+    }
+    return val;
+  }, z.union([
     // SSE 타입
     z.object({
       type: z.literal('sse'),
@@ -58,7 +64,7 @@ export const ConfigSchema = z.object({
       args: z.array(z.string()).default([]),
       env: z.record(z.string()).optional(),
     }),
-  ])).default({}),
+  ]))).default({}),
 });
 
 export type ClackbotConfig = z.infer<typeof ConfigSchema>;

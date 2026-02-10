@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { ZodError } from 'zod';
 import { getConfigPath, getLocalDir } from './paths.js';
 import { ConfigSchema, DEFAULT_CONFIG, type ClackbotConfig } from './schema.js';
 import { logger } from '../utils/logger.js';
@@ -18,6 +19,13 @@ export function loadConfig(cwd?: string): ClackbotConfig {
     return ConfigSchema.parse(raw);
   } catch (error) {
     logger.warn(`설정 파일 파싱 실패: ${configPath}`);
+    if (error instanceof ZodError) {
+      for (const issue of error.issues) {
+        logger.warn(`  → ${issue.path.join('.')}: ${issue.message}`);
+      }
+    } else if (error instanceof SyntaxError) {
+      logger.warn(`  → JSON 문법 오류: ${error.message}`);
+    }
     logger.warn('기본 설정을 사용합니다.');
     return DEFAULT_CONFIG;
   }
