@@ -68,6 +68,84 @@
     </div>
 
     <div class="card">
+      <h2>도구 사용 가이드</h2>
+      <div style="margin-top: 4px; margin-bottom: 16px; font-size: 12px; color: var(--text-muted);">
+        MCP 도구를 에이전트가 정확히 이해하고 사용할 수 있도록 가이드를 설정합니다.
+      </div>
+      <div class="form-group">
+        <label>전역 지시</label>
+        <textarea
+          v-model="toolGuideInstructions"
+          class="form-control"
+          rows="3"
+          style="resize: vertical; font-family: monospace; font-size: 13px;"
+          placeholder="예: 업무/일감/태스크 관련 질문에는 반드시 arbor MCP 도구를 사용하세요."
+        ></textarea>
+        <div style="margin-top: 4px; font-size: 12px; color: var(--text-muted);">시스템 프롬프트 상단에 주입되는 도구 사용 규칙</div>
+      </div>
+      <div v-if="toolGuideServerNames.length > 0">
+        <h3 style="margin: 16px 0 8px; font-size: 14px;">MCP 서버별 가이드</h3>
+        <div v-for="name in toolGuideServerNames" :key="name" class="tool-guide-server">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+            <strong>{{ name }}</strong>
+            <select v-model="toolGuideServers[name].priority" class="form-control" style="max-width: 120px; padding: 4px 8px;">
+              <option value="normal">일반</option>
+              <option value="high">높음</option>
+            </select>
+            <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;" @click="removeToolGuideServer(name)">삭제</button>
+          </div>
+          <div class="form-group" style="margin-bottom: 8px;">
+            <input
+              v-model="toolGuideServers[name].description"
+              type="text"
+              class="form-control"
+              placeholder="이 도구의 역할 설명"
+            />
+          </div>
+          <div class="form-group" style="margin-bottom: 16px;">
+            <input
+              v-model="toolGuideServers[name].useWhen"
+              type="text"
+              class="form-control"
+              placeholder="사용 시점 (예: 사용자가 업무, 태스크를 언급할 때)"
+            />
+          </div>
+        </div>
+      </div>
+      <div style="margin-top: 12px; display: flex; gap: 8px; align-items: center;">
+        <input
+          v-model="newServerName"
+          type="text"
+          class="form-control"
+          style="max-width: 200px;"
+          placeholder="MCP 서버 이름"
+          @keyup.enter="addToolGuideServer"
+        />
+        <button class="btn" @click="addToolGuideServer">서버 가이드 추가</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>메모리</h2>
+      <div style="margin-top: 4px; margin-bottom: 16px; font-size: 12px; color: var(--text-muted);">
+        봇이 기억하는 정보입니다. 사용자가 "기억해"라고 요청할 때 저장됩니다.
+      </div>
+      <div class="form-group">
+        <textarea
+          v-model="memoryContent"
+          class="form-control"
+          rows="8"
+          style="resize: vertical; font-family: monospace; font-size: 13px;"
+          placeholder="메모리가 비어있습니다."
+        ></textarea>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn" @click="saveMemory">메모리 저장</button>
+        <button class="btn btn-danger" @click="clearMemory">메모리 초기화</button>
+      </div>
+    </div>
+
+    <div class="card">
       <h2>봇 설정</h2>
       <div class="form-group" style="margin-top: 16px;">
         <label>소유자 Slack User ID</label>
@@ -128,9 +206,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, reactive, onMounted } from 'vue'
 import { api } from '../composables/useApi'
-import type { ConfigResponse, SlackUser } from '../types/api'
+import type { ConfigResponse, SlackUser, MemoryResponse, ToolGuideServer } from '../types/api'
 
 const preset = ref<string>('istj')
 const customPrompt = ref('')
@@ -146,28 +224,65 @@ const slackUsers = ref<SlackUser[]>([])
 const usersLoaded = ref(false)
 const usersFailed = ref(false)
 
+// 도구 가이드
+const toolGuideInstructions = ref('')
+const toolGuideServers = reactive<Record<string, ToolGuideServer>>({})
+const toolGuideServerNames = computed(() => Object.keys(toolGuideServers))
+const newServerName = ref('')
+
+function addToolGuideServer() {
+  const name = newServerName.value.trim()
+  if (!name) return
+  if (toolGuideServers[name]) {
+    alert(`"${name}" 서버 가이드가 이미 존재합니다.`)
+    return
+  }
+  toolGuideServers[name] = { description: '', priority: 'normal', useWhen: '' }
+  newServerName.value = ''
+}
+
+function removeToolGuideServer(name: string) {
+  delete toolGuideServers[name]
+}
+
+// 메모리
+const memoryContent = ref('')
+
+async function saveMemory() {
+  try {
+    await api<{ error?: string }>('/api/memory', {
+      method: 'PUT',
+      body: JSON.stringify({ content: memoryContent.value }),
+    })
+    alert('메모리가 저장되었습니다.')
+  } catch (err) {
+    alert('메모리 저장 실패: ' + (err instanceof Error ? err.message : String(err)))
+  }
+}
+
+async function clearMemory() {
+  if (!confirm('메모리를 초기화하시겠습니까? 모든 기억이 삭제됩니다.')) return
+  memoryContent.value = ''
+  await saveMemory()
+}
+
 const presetDescriptions: Record<string, string> = {
-  // 분석가
   intj: '논리적, 전략적, 간결. 감정보다 사실 중심. 이모지 없음.',
   intp: '정밀한 분석, 다각도 관점 제시. 객관적 톤. 이모지 없음.',
   entj: '단호하고 자신감 있는 리더 톤. 결론 먼저. 이모지 없음.',
   entp: '창의적, 재치 있는 톤. 아이디어 브레인스토밍. 이모지 가능.',
-  // 외교관
   infj: '사려 깊고 통찰력 있는 톤. 공감과 본질 파악.',
   infp: '따뜻하고 공감적. 감정 인정, 격려하는 어조.',
   enfj: '격려하는 리더 톤. 칭찬과 팀 조화 강조. 이모지 사용.',
-  enfp: '열정적, 밝고 에너지 넘침. 이모지 자주 사용 🎉',
-  // 관리자
+  enfp: '열정적, 밝고 에너지 넘침. 이모지 자주 사용.',
   istj: '사실 기반, 체계적, 정확. 핵심만 전달. 이모지 없음.',
   isfj: '따뜻하고 세심. 안정감 있는 차분한 어조.',
   estj: '결단력 있고 체계적. 규칙과 기한 명확. 이모지 없음.',
   esfj: '사교적, 친근. 팀 화합과 배려 강조. 이모지 적절히 사용.',
-  // 탐험가
   istp: '실용적, 담백. 문제 해결 직행. 최소 2~4줄. 이모지 없음.',
   isfp: '부드럽고 배려 있는 톤. 창의적 접근. 이모지 소량.',
   estp: '직설적, 에너지 넘침. 즉시 실행 가능한 조언.',
-  esfp: '밝고 유쾌. 분위기 메이커. 이모지 자주 사용 ✨',
-  // 기타
+  esfp: '밝고 유쾌. 분위기 메이커. 이모지 자주 사용.',
   custom: '아래에 직접 프롬프트를 작성하세요.',
 }
 
@@ -185,6 +300,24 @@ onMounted(async () => {
     timeoutMinutes.value = config.session?.timeoutMinutes || 30
     webPort.value = config.webPort || 3847
     slackInfo.value = config.slack || {}
+
+    // toolGuide 로드
+    if (config.toolGuide) {
+      toolGuideInstructions.value = config.toolGuide.instructions || ''
+      if (config.toolGuide.servers) {
+        for (const [name, server] of Object.entries(config.toolGuide.servers)) {
+          toolGuideServers[name] = { ...server }
+        }
+      }
+    }
+
+    // 메모리 로드
+    try {
+      const mem = await api<MemoryResponse>('/api/memory')
+      memoryContent.value = mem.content || ''
+    } catch {
+      // 메모리 로드 실패 시 무시
+    }
 
     // Slack 사용자 목록 비동기 로드
     try {
@@ -213,6 +346,18 @@ async function saveSettings() {
     return
   }
 
+  // toolGuide 서버에서 빈 항목 정리
+  const servers: Record<string, ToolGuideServer> = {}
+  for (const [name, server] of Object.entries(toolGuideServers)) {
+    if (server.description.trim()) {
+      servers[name] = {
+        description: server.description.trim(),
+        priority: server.priority,
+        ...(server.useWhen?.trim() ? { useWhen: server.useWhen.trim() } : {}),
+      }
+    }
+  }
+
   const updates = {
     ownerUserId: ownerUserId.value || undefined,
     webPort: webPort.value,
@@ -225,6 +370,10 @@ async function saveSettings() {
       ...(preset.value === 'custom' ? { customPrompt: customPrompt.value } : {}),
       thinkingMessage: thinkingMessage.value || '생각 중...',
       showProgress: showProgress.value,
+    },
+    toolGuide: {
+      ...(toolGuideInstructions.value.trim() ? { instructions: toolGuideInstructions.value.trim() } : {}),
+      ...(Object.keys(servers).length > 0 ? { servers } : {}),
     },
   }
 
@@ -243,3 +392,12 @@ async function saveSettings() {
   }
 }
 </script>
+
+<style scoped>
+.tool-guide-server {
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+</style>

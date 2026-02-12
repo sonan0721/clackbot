@@ -5,6 +5,7 @@ import { getMcpServers } from './tools/loader.js';
 import { loadConfig } from '../config/index.js';
 import { logger } from '../utils/logger.js';
 import type { ConversationMode } from '../slack/listeners/handler.js';
+import type { ProjectContext } from './projectContext.js';
 
 // Claude Agent SDK query() 래퍼
 
@@ -15,10 +16,10 @@ function formatToolActivity(name: string, input?: Record<string, unknown>): stri
     Read: (i) => `📖 파일 읽는 중${i?.file_path ? `: ${basename(String(i.file_path))}` : ''}`,
     Write: (i) => `✏️ 파일 작성 중${i?.file_path ? `: ${basename(String(i.file_path))}` : ''}`,
     Edit: (i) => `✏️ 파일 수정 중${i?.file_path ? `: ${basename(String(i.file_path))}` : ''}`,
-    Bash: (i) => `⚡ 명령어 실행 중${i?.command ? `: ${String(i.command).slice(0, 50)}` : ''}`,
-    Grep: (i) => `🔍 검색 중${i?.pattern ? `: ${String(i.pattern).slice(0, 40)}` : ''}`,
-    Glob: (i) => `🔍 파일 탐색 중${i?.pattern ? `: ${String(i.pattern).slice(0, 40)}` : ''}`,
-    WebSearch: (i) => `🌐 웹 검색 중${i?.query ? `: ${String(i.query).slice(0, 40)}` : ''}`,
+    Bash: (i) => `⚡ 명령어 실행 중${i?.command ? `: ${String(i.command).slice(0, 120)}` : ''}`,
+    Grep: (i) => `🔍 검색 중${i?.pattern ? `: ${String(i.pattern).slice(0, 80)}` : ''}`,
+    Glob: (i) => `🔍 파일 탐색 중${i?.pattern ? `: ${String(i.pattern).slice(0, 80)}` : ''}`,
+    WebSearch: (i) => `🌐 웹 검색 중${i?.query ? `: ${String(i.query).slice(0, 80)}` : ''}`,
     WebFetch: () => '🌐 웹 페이지 확인 중',
     slack_post: (i) => `💬 Slack 메시지 전송 중${i?.channel ? ` → #${String(i.channel)}` : ''}`,
     slack_send_dm: () => '💬 DM 전송 중',
@@ -57,6 +58,8 @@ export interface QueryParams {
   mode: ConversationMode;
   /** 스트리밍 중 진행 상태 콜백 (도구 사용, 텍스트 생성 등) */
   onProgress?: (status: string) => void;
+  /** 프로젝트 컨텍스트 (로컬 Claude Code 지식 공유) */
+  projectContext?: ProjectContext;
 }
 
 export interface QueryResult {
@@ -69,36 +72,40 @@ export interface QueryResult {
  * Claude Agent SDK를 사용하여 응답 생성
  */
 export async function queryAgent(params: QueryParams): Promise<QueryResult> {
-  const { prompt, cwd, threadMessages, resumeId, isOwner, attachments, mode, onProgress } = params;
+  const { prompt, cwd, threadMessages, resumeId, isOwner, attachments, mode, onProgress, projectContext } = params;
 
   // mode → 시스템 프롬프트 컨텍스트 매핑
   const promptContext = mode === 'channel' ? 'channel' : mode === 'dm' ? 'dm' : 'mention' as const;
 
-  // 스레드 컨텍스트를 프롬프트에 포함 (앱/사용자 구분)
+  // 스레드 컨텍스트를 프롬프트에 포함 (최근 10개 메시지만)
   let fullPrompt = prompt;
   if (threadMessages && threadMessages.length > 0) {
-    const threadContext = threadMessages
+    const recentMessages = threadMessages.slice(-10);
+    const threadContext = recentMessages
       .map(m => {
         const role = m.botId ? `🤖 앱(${m.user})` : `👤 사용자(${m.user})`;
         return `[${role}]: ${m.text}`;
       })
       .join('\n');
-    fullPrompt = `스레드 대화 컨텍스트:\n${threadContext}\n\n현재 메시지:\n${prompt}`;
+    const truncatedNote = threadMessages.length > 10
+      ? `(이전 ${threadMessages.length - 10}개 메시지 생략)\n`
+      : '';
+    fullPrompt = `스레드 대화 컨텍스트:\n${truncatedNote}${threadContext}\n\n현재 메시지:\n${prompt}`;
   }
 
-  // 첨부파일 정보를 프롬프트에 추가
+  // 첨부파일 정보를 프롬프트에 추가 (이미지는 강조 지시)
   if (attachments && attachments.length > 0) {
     const attachmentLines = attachments.map(a => {
       if (a.mimetype.startsWith('image/')) {
-        return `첨부 이미지: ${a.name} (경로: ${a.path}) — Read 도구로 확인하세요`;
+        return `[필수] 첨부 이미지: ${a.name} (경로: ${a.path}) — 반드시 Read 도구로 이미지를 확인한 후 답변하세요`;
       }
       return `첨부 파일: ${a.name} (경로: ${a.path}) — Read 도구로 확인하세요`;
     });
     fullPrompt += `\n\n${attachmentLines.join('\n')}`;
   }
 
-  // 시스템 프롬프트 생성 (컨텍스트 분리)
-  const systemPrompt = buildSystemPrompt(cwd, promptContext);
+  // 시스템 프롬프트 생성 (컨텍스트 분리 + 프로젝트 지식 주입)
+  const systemPrompt = buildSystemPrompt(cwd, promptContext, projectContext);
 
   // MCP 서버 설정 (channel 모드는 도구 불가 → MCP 프로세스 불필요)
   const mcpServers = mode === 'channel' ? {} : getMcpServers(cwd);
@@ -121,7 +128,7 @@ export async function queryAgent(params: QueryParams): Promise<QueryResult> {
         cwd,
         canUseTool,
         mcpServers,
-        maxTurns: mode === 'channel' ? 5 : isOwner ? 20 : 10,
+        maxTurns: mode === 'channel' ? 3 : mode === 'dm' ? 15 : isOwner ? 10 : 5,
         ...(resumeId ? { resume: resumeId } : {}),
       },
     });
@@ -147,11 +154,14 @@ export async function queryAgent(params: QueryParams): Promise<QueryResult> {
         };
         if (sysMsg.subtype === 'init' && sysMsg.mcp_servers) {
           for (const server of sysMsg.mcp_servers) {
+            // 내장 도구 서버는 로그 생략
+            if (server.name === '_builtin' || server.name === 'clackbot-builtin') continue;
             if (server.status === 'connected') {
               logger.info(`MCP 서버 연결 성공: ${server.name}`);
             } else {
               logger.warn(`MCP 서버 연결 실패: ${server.name} (${server.status})`);
               failedServers.push(server);
+              pushActivity(`⚠️ MCP 서버 연결 실패: ${server.name}`);
             }
           }
         }
@@ -183,8 +193,8 @@ export async function queryAgent(params: QueryParams): Promise<QueryResult> {
             if (block.type === 'text' && block.text) {
               if (!responseText) responseText = '';
               responseText += block.text;
-              // 텍스트의 첫 줄을 활동으로 기록 (80자 제한)
-              const firstLine = block.text.split('\n')[0].trim();
+              // 텍스트의 첫 줄을 활동으로 기록
+              const firstLine = block.text.split('\n')[0].trim().slice(0, 120);
               if (firstLine) {
                 pushActivity(`💬 ${firstLine}`);
               }

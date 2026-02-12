@@ -146,3 +146,4 @@ vite.config.ts.timestamp-*
 
 # Claude Code 세션
 .claude/
+docs/plans

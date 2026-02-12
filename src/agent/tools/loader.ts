@@ -206,8 +206,8 @@ export type McpServerConfig =
 export function getMcpServers(cwd?: string): Record<string, McpServerConfig> {
   const servers: Record<string, McpServerConfig> = {};
 
-  // 내장 도구 서버
-  servers['clackbot'] = createSdkMcpServer({
+  // 내장 도구 서버 (SDK 내부 MCP로 등록)
+  servers['_builtin'] = createSdkMcpServer({
     name: 'clackbot-builtin',
     version: '1.0.0',
     tools: [slackPostTool, slackReadChannelTool, slackSendDmTool, memoryReadTool, memoryWriteTool],

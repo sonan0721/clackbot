@@ -152,6 +152,38 @@ async function checkForUpdates(branch: string): Promise<void> {
   }
 }
 
+/** 포트를 사용 중인 프로세스(PID)를 찾아 종료 */
+async function killExistingProcess(port: number): Promise<void> {
+  if (isWindows) {
+    try {
+      const result = execFileSync('netstat', ['-ano'], { encoding: 'utf-8', shell: true });
+      const lines = result.split('\n').filter(l => l.includes(`:${port}`) && l.includes('LISTENING'));
+      for (const line of lines) {
+        const pid = line.trim().split(/\s+/).pop();
+        if (pid && /^\d+$/.test(pid)) {
+          logger.info(`기존 프로세스(PID ${pid}, 포트 ${port}) 종료 중...`);
+          execFileSync('taskkill', ['/F', '/PID', pid], { shell: true, stdio: 'pipe' });
+        }
+      }
+    } catch { /* 실패 시 무시 */ }
+  } else {
+    try {
+      const result = execFileSync('lsof', ['-ti', `tcp:${port}`], { encoding: 'utf-8', timeout: 5000 });
+      const pids = result.trim().split('\n').filter(Boolean);
+      for (const pid of pids) {
+        logger.info(`기존 프로세스(PID ${pid}, 포트 ${port}) 종료 중...`);
+        try {
+          process.kill(Number(pid), 'SIGTERM');
+        } catch { /* 이미 종료됨 */ }
+      }
+      // 종료 대기 (최대 3초)
+      if (pids.length > 0) {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
+    } catch { /* lsof 결과 없음 = 포트 미사용 */ }
+  }
+}
+
 export async function startCommand(options: StartOptions): Promise<void> {
   const cwd = process.cwd();
 
@@ -235,6 +267,8 @@ export async function startCommand(options: StartOptions): Promise<void> {
     const enableWeb = options.web !== false;
     if (enableWeb) {
       const port = parseInt(options.port || String(config.webPort), 10);
+      // 기존 프로세스가 포트를 점유하고 있으면 종료
+      await killExistingProcess(port);
       await startWebServer(port);
     }
 

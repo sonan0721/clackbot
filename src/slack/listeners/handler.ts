@@ -1,10 +1,11 @@
 import type { WebClient } from '@slack/web-api';
 import { queryAgent, type Attachment } from '../../agent/claude.js';
+import { resolveProjectContext } from '../../agent/projectContext.js';
 import { sessionManager } from '../../session/manager.js';
 import { saveConversation } from '../../store/conversations.js';
 import { getLocalDir } from '../../config/paths.js';
 import { loadConfig } from '../../config/index.js';
-import { truncateText } from '../../utils/slackFormat.js';
+import { truncateText, markdownToMrkdwn } from '../../utils/slackFormat.js';
 import { logger } from '../../utils/logger.js';
 
 // 메시지 처리 공통 핸들러
@@ -52,6 +53,27 @@ export async function handleMessage(params: HandleMessageParams): Promise<void> 
 
   try {
     const cwd = getLocalDir();
+
+    // 프로젝트 태그 파싱: "[dev] API 추가해줘" → 프로젝트 컨텍스트 로드
+    const projectResult = resolveProjectContext(inputText);
+    const effectiveInput = projectResult.cleanPrompt;
+
+    // 프로젝트 태그 오류 시 안내 메시지
+    if (projectResult.error) {
+      const errorText = projectResult.error;
+      if (thinkingTs) {
+        try {
+          await client.chat.update({ channel: channelId, ts: thinkingTs, text: errorText });
+          return;
+        } catch { /* update 실패 시 아래에서 새 메시지 */ }
+      }
+      if (replyInChannel) {
+        await say({ text: errorText });
+      } else {
+        await say({ text: errorText, thread_ts: threadTs });
+      }
+      return;
+    }
 
     // 세션 관리 (channel 모드는 1회성 → 세션 스킵)
     let sessionId: string;
@@ -118,7 +140,7 @@ export async function handleMessage(params: HandleMessageParams): Promise<void> 
 
     // Claude Agent 호출
     const response = await queryAgent({
-      prompt: inputText,
+      prompt: effectiveInput,
       cwd,
       threadMessages,
       sessionId,
@@ -127,6 +149,7 @@ export async function handleMessage(params: HandleMessageParams): Promise<void> 
       attachments,
       mode,
       onProgress,
+      projectContext: projectResult.context ?? undefined,
     });
 
     // 남은 타이머 정리
@@ -140,8 +163,8 @@ export async function handleMessage(params: HandleMessageParams): Promise<void> 
       });
     }
 
-    // 응답 전송 — "생각 중..." 메시지를 교체
-    const responseText = truncateText(response.text);
+    // 응답 전송 — Markdown→mrkdwn 변환 후 "생각 중..." 메시지를 교체
+    const responseText = truncateText(markdownToMrkdwn(response.text));
 
     if (thinkingTs) {
       try {

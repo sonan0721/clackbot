@@ -85,6 +85,16 @@ router.put('/', (req, res) => {
       config.mcpServers = validated;
     }
 
+    if (updates.toolGuide !== undefined) {
+      const validated = ConfigSchema.shape.toolGuide.parse(updates.toolGuide);
+      config.toolGuide = validated;
+    }
+
+    if (updates.projects !== undefined) {
+      const validated = ConfigSchema.shape.projects.parse(updates.projects);
+      config.projects = validated;
+    }
+
     saveConfig(config);
     res.json({ message: '설정이 저장되었습니다.', config });
   } catch (error) {

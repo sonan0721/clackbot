@@ -9,6 +9,8 @@ import conversationsRouter from './api/conversations.js';
 import configRouter from './api/config.js';
 import pluginsRouter from './api/plugins.js';
 import slackRouter from './api/slack.js';
+import memoryRouter from './api/memory.js';
+import projectsRouter from './api/projects.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -46,6 +48,8 @@ export function createWebServer() {
   app.use('/api/config', configRouter);
   app.use('/api/plugins', pluginsRouter);
   app.use('/api/slack', slackRouter);
+  app.use('/api/memory', memoryRouter);
+  app.use('/api/projects', projectsRouter);
 
   // 정적 파일 서빙 (Vite 빌드 출력)
   const publicDir = path.resolve(__dirname, 'public');

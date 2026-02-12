@@ -87,6 +87,17 @@ export interface ToolsResponse {
   total: number
 }
 
+export interface ToolGuideServer {
+  description: string
+  priority: 'high' | 'normal'
+  useWhen?: string
+}
+
+export interface ToolGuide {
+  instructions?: string
+  servers?: Record<string, ToolGuideServer>
+}
+
 export interface ConfigResponse {
   ownerUserId?: string
   webPort: number
@@ -112,10 +123,31 @@ export interface ConfigResponse {
     | { type: 'sse'; url: string; headers?: Record<string, string> }
     | { type: 'http'; url: string; headers?: Record<string, string> }
   >
+  toolGuide?: ToolGuide
+}
+
+export interface MemoryResponse {
+  content: string
 }
 
 export interface SlackUser {
   id: string
   displayName: string
   realName: string
+}
+
+export interface ProjectInfo {
+  name: string
+  path: string
+  description: string
+  pathExists: boolean
+  hasClaudeMd: boolean
+  hasMemory: boolean
+}
+
+export interface ProjectContextPreview {
+  projectName: string
+  projectPath: string
+  claudeMd: string | null
+  memory: string | null
 }

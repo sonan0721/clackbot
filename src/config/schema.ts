@@ -38,6 +38,29 @@ export const ConfigSchema = z.object({
     showProgress: z.boolean().default(true),
   }).default({}),
 
+  // 도구 사용 가이드 (MCP 도구 해석력 향상)
+  toolGuide: z.object({
+    /** 도구 사용에 대한 전역 지시 (시스템 프롬프트 상단 주입) */
+    instructions: z.string().optional(),
+    /** MCP 서버별 사용 가이드 */
+    servers: z.record(z.object({
+      /** 해당 MCP 서버의 역할 설명 */
+      description: z.string(),
+      /** 우선도: high면 시스템 프롬프트에서 강조 */
+      priority: z.enum(['high', 'normal']).default('normal'),
+      /** 사용 시점 조건 */
+      useWhen: z.string().optional(),
+    })).optional(),
+  }).default({}),
+
+  // 프로젝트 컨텍스트 공유 (로컬 Claude Code와 지식 공유)
+  projects: z.record(z.object({
+    /** 프로젝트 루트 경로 (절대경로) */
+    path: z.string(),
+    /** 프로젝트 설명 (대시보드 표시용) */
+    description: z.string().optional(),
+  })).default({}),
+
   // MCP 서버 설정 (플러그인 설치 시 저장)
   mcpServers: z.record(z.preprocess((val) => {
     // type 없이 url만 있으면 sse로 추론
