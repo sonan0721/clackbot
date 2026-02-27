@@ -42,10 +42,11 @@ Clackbot은 사용자의 **로컬 머신**에서 실행되며, **Claude Code Age
 |-----------|------|
 | 런타임 | Node.js 18+ / TypeScript (ESM) |
 | Slack | `@slack/bolt` (Socket Mode) |
-| AI | `@anthropic-ai/claude-code` (Agent SDK) |
+| AI | `@anthropic-ai/claude-code` (Agent SDK) — Brain + Sub Agent 멀티에이전트 |
+| AI 라우팅 | Claude Code Skills (`.claude/skills/`) + Agents (`.claude/agents/`) |
 | CLI | `commander` |
-| 웹 대시보드 | `express` + Vanilla JS SPA |
-| DB | `better-sqlite3` (대화 이력) |
+| 웹 대시보드 | `express` + Vue 3 SPA (Vite 빌드) |
+| DB | `better-sqlite3` (대화 이력, 에이전트 세션, 활동 로그, 메모리 스냅샷) |
 | 설정 | `dotenv` + `zod` |
 | 빌드 | `tsx` (dev), `tsc` (build) |
 | 패키지 | npm `@sonanlee/clackbot` |
@@ -63,20 +64,40 @@ clackbot/
 │   │   ├── app.ts               # Bolt App 팩토리 (Socket Mode)
 │   │   ├── client.ts            # 공유 Slack 클라이언트 싱글턴
 │   │   ├── listeners/           # 이벤트 핸들러 (appMention, directMessage)
+│   │   │   └── handler.ts       # Brain/Sub Agent 라우팅 핸들러
 │   │   └── middleware/          # 접근 제어 (owner/public 모드)
 │   ├── agent/                   # Claude Agent SDK 연동
-│   │   ├── claude.ts            # query() 래퍼
+│   │   ├── claude.ts            # Sub Agent query() 래퍼
+│   │   ├── brain.ts             # Brain Agent 모듈 (글로벌 메모리, 라우팅)
 │   │   ├── systemPrompt.ts      # 규칙 + 성격 프리셋 → 시스템 프롬프트
 │   │   ├── permissions.ts       # createCanUseTool 팩토리 (역할 기반)
 │   │   └── tools/               # MCP 도구 (내장 + MCP 서버 + 플러그인 로더)
-│   ├── web/                     # 웹 대시보드 (Express + Vue SPA)
+│   │       └── builtin/         # 내장 도구 (brainMemory, slackPost, slackReadThread 등)
+│   ├── web/                     # 웹 대시보드 (Express + Vue 3 SPA)
 │   │   ├── server.ts
-│   │   ├── api/                 # REST API (tools, conversations, config, plugins, slack)
-│   │   └── public/              # 프론트엔드 (Vite 빌드 출력)
-│   ├── store/conversations.ts   # SQLite 대화 이력 (세션별 그룹핑)
-│   ├── session/manager.ts       # 세션 생명주기 (자동 리셋)
+│   │   ├── api/                 # REST API (sessions, activities, agents, memory 등)
+│   │   └── frontend/            # Vue 3 SFC (Vite 빌드)
+│   ├── store/
+│   │   ├── conversations.ts     # SQLite 대화 이력 + 스키마 관리
+│   │   ├── agentSessions.ts     # 에이전트 세션 & 활동 CRUD
+│   │   └── brainMemory.ts       # Brain 메모리 파일 관리 + 스냅샷
+│   ├── session/manager.ts       # 세션 생명주기 (멀티에이전트 지원)
 │   ├── config/                  # Zod 스키마, 경로, 설정 로더
 │   └── utils/                   # 로거, Slack 포맷 유틸
+├── .claude/
+│   ├── skills/                  # Claude Code Skills (Brain 행동 규칙)
+│   │   └── brain-router/SKILL.md
+│   └── agents/                  # Claude Code Agents (Sub Agent 정의)
+│       ├── channel-analyst.md
+│       ├── weekly-reporter.md
+│       └── task-organizer.md
+├── .clackbot/
+│   └── brain/                   # Brain 메모리 파일 (런타임 생성)
+│       ├── memory.md            # 사용자 프로필, 선호, 핵심 패턴
+│       ├── sessions.md          # 활성 세션 요약
+│       ├── knowledge.md         # 학습된 지식
+│       ├── tasks.md             # 작업 히스토리
+│       └── channels/            # 채널별 분석 메모
 ├── scripts/                     # 빌드 스크립트 (크로스 플랫폼)
 ├── templates/                   # clackbot init 복사 템플릿
 └── examples/tools/              # 플러그인 JSON 예제 (Trello, GitHub, Jira)
@@ -107,20 +128,26 @@ clackbot start
 
 ---
 
-## 5) 핵심 데이터 흐름
+## 5) 핵심 데이터 흐름 (Brain Agent v3)
 
 ```
 Slack @봇이름 멘션/DM
   → Bolt App (Socket Mode)
   → accessControl (owner/public 모드, isOwner 판별)
   → Slack 파일 다운로드 (첨부파일 있을 시)
-  → SessionManager (스레드별 세션, SQLite 영속, 자동 리셋)
-  → 스레드 컨텍스트 조회 (conversations.replies)
-  → 대화 기록 저장 (SQLite)
+  → SessionManager (스레드별 세션, 멀티에이전트 지원)
   → "생각 중..." 상태 메시지 게시
-  → Agent SDK query({ prompt, cwd, mcpServers, canUseTool(isOwner), resume })
-  → Claude → MCP 도구 호출 (slack_post, slack_send_dm, 플러그인 등)
+  → 라우팅 판단:
+    ├─ 활성 Sub Agent 세션 있음 → queryAgent() (기존 세션 이어서)
+    ├─ channel 모드 (1회성) → queryAgent() (Brain 없이)
+    └─ DM/Thread → queryBrain() (Brain Agent 라우팅)
+  → Brain Agent:
+    ├─ 코어 메모리 로드 (memory.md, sessions.md)
+    ├─ Claude Code Skills 발동 (brain-router)
+    ├─ 간단한 요청 → 직접 답변
+    └─ 복잡한 작업 → Task 도구로 Sub Agent 생성
   → 응답 저장 → chat.update()로 상태 메시지를 응답으로 교체
+  → 활동 로그 기록 (agent_activities)
 ```
 
 ---
@@ -178,13 +205,16 @@ Owner DM으로 봇에게 자연어로 설치 요청하거나 수동으로 config
 
 ## 9) 웹 대시보드
 
-`clackbot start` 시 http://localhost:3847 에서 접근 가능. 순수 모니터링 + 설정 대시보드.
+`clackbot start` 시 http://localhost:3847 에서 접근 가능. Vue 3 SPA 기반 모니터링 + 설정 대시보드.
 
 | 페이지 | 내용 |
 |--------|------|
-| 홈 | 봇 상태, 최근 대화 요약 |
+| 홈 | 봇 상태, 활성 세션 요약, 최근 활동 타임라인, 최근 대화 |
 | 대화 이력 | 세션(스레드)별 대화 목록, 클릭 시 상세 보기, 검색 |
-| 연동 툴 | 내장 도구 + MCP 서버 목록 (설치/관리는 DM으로) |
+| 세션 관리 | Brain/Sub Agent 세션 목록 (상태 필터), 활동 로그, 세션 종료 |
+| 연동 툴 | 내장 도구 + MCP 서버 + Agents/Skills 목록 |
+| Brain 메모리 | 메모리 파일 트리, 내용 열람, 변경 이력 (스냅샷) |
+| 프로젝트 | 프로젝트 태그 관리, 컨텍스트 미리보기 |
 | 설정 | 접근 모드, 성격 프리셋, 세션 설정, 소유자 지정 |
 
 ---
@@ -200,12 +230,22 @@ Owner DM으로 봇에게 자연어로 설치 요청하거나 수동으로 config
 
 ---
 
-## 11) 세션 관리
+## 11) 세션 관리 (멀티에이전트)
 
+### Brain Agent 세션
+- 매 요청마다 새 Brain 세션 생성
+- 코어 메모리(memory.md, sessions.md)를 시스템 프롬프트에 주입
+- Skills (`.claude/skills/`) 자동 발견 → 라우팅 로직 발동
+
+### Sub Agent 세션
 - 스레드별 세션 ID 유지 (Agent SDK `resume` 파라미터)
-- **SQLite 영속**: 서버 재시작 후에도 세션(resumeId 포함) 유지
-- 자동 리셋: 메시지 20개 초과 / 30분 경과
-- 리셋 시 새 세션 생성
+- Agents (`.claude/agents/`) 정의 → `Task` 도구로 생성
+- **SQLite 영속**: `agent_sessions`, `agent_activities` 테이블
+- 활동 로그: 도구 사용, 스킬 호출, 에이전트 생성, 메모리 업데이트
+
+### 자동 리셋
+- Slack 세션: 메시지 20개 초과 / 30분 경과 시 리셋
+- Agent 세션: 작업 완료 / 만료 시 상태 변경
 
 ---
 

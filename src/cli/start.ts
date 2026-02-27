@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { createSlackApp, startSlackApp } from '../slack/app.js';
 import { startWebServer } from '../web/server.js';
 import { initDatabase, closeDatabase } from '../store/conversations.js';
+import { initBrainMemory } from '../store/brainMemory.js';
 import { setSlackClient } from '../agent/tools/builtin/slackPost.js';
 import { setSlackClientForDm } from '../agent/tools/builtin/slackSendDm.js';
 import { setSharedSlackClient } from '../slack/client.js';
@@ -251,6 +252,14 @@ export async function startCommand(options: StartOptions): Promise<void> {
 
   // 대화 DB 초기화
   initDatabase(cwd);
+
+  // Brain 메모리 디렉토리 및 기본 파일 초기화
+  try {
+    initBrainMemory(cwd);
+    logger.debug('Brain 메모리 초기화 완료');
+  } catch (err) {
+    logger.warn(`Brain 메모리 초기화 실패 (무시): ${err instanceof Error ? err.message : String(err)}`);
+  }
 
   try {
     // Slack 앱 생성 및 시작
