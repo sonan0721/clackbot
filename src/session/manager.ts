@@ -1,6 +1,8 @@
 import { v4 as uuidv4 } from 'uuid';
 import { loadConfig } from '../config/index.js';
 import { upsertSlackSession, getSlackSession, deleteSlackSession } from '../store/conversations.js';
+import { getAgentSessionByThread } from '../store/agentSessions.js';
+import type { AgentSession } from '../store/agentSessions.js';
 import { logger } from '../utils/logger.js';
 import type { Session } from './types.js';
 
@@ -8,13 +10,14 @@ import type { Session } from './types.js';
 
 class SessionManager {
   /** 스레드에 대한 세션 조회 또는 생성 */
-  getOrCreate(threadTs: string): Session {
+  getOrCreate(threadTs: string, agentType: 'brain' | string = 'brain'): Session {
     const existing = getSlackSession(threadTs);
 
     if (existing) {
       const session: Session = {
         id: existing.sessionId,
         threadTs: existing.threadTs,
+        agentType,
         resumeId: existing.resumeId,
         messageCount: existing.messageCount,
         createdAt: existing.createdAt,
@@ -25,7 +28,7 @@ class SessionManager {
       if (this.shouldReset(session)) {
         logger.debug(`세션 자동 리셋: ${threadTs}`);
         deleteSlackSession(threadTs);
-        return this.createSession(threadTs);
+        return this.createSession(threadTs, agentType);
       }
 
       // 활성 시간 갱신
@@ -42,7 +45,7 @@ class SessionManager {
       return session;
     }
 
-    return this.createSession(threadTs);
+    return this.createSession(threadTs, agentType);
   }
 
   /** 세션 업데이트 */
@@ -69,6 +72,11 @@ class SessionManager {
     logger.debug(`세션 수동 리셋: ${threadTs}`);
   }
 
+  /** 스레드의 활성 에이전트 세션 조회 (agent_sessions 테이블) */
+  getActiveAgentSession(threadTs: string): AgentSession | null {
+    return getAgentSessionByThread(threadTs);
+  }
+
   /** 자동 리셋 조건 확인 */
   private shouldReset(session: Session): boolean {
     const config = loadConfig();
@@ -89,10 +97,11 @@ class SessionManager {
     return false;
   }
 
-  private createSession(threadTs: string): Session {
+  private createSession(threadTs: string, agentType: 'brain' | string = 'brain'): Session {
     const session: Session = {
       id: uuidv4(),
       threadTs,
+      agentType,
       messageCount: 0,
       createdAt: Date.now(),
       lastActiveAt: Date.now(),

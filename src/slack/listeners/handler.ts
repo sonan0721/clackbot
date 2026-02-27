@@ -1,8 +1,11 @@
 import type { WebClient } from '@slack/web-api';
 import { queryAgent, type Attachment } from '../../agent/claude.js';
+import { queryBrain } from '../../agent/brain.js';
 import { resolveProjectContext } from '../../agent/projectContext.js';
 import { sessionManager } from '../../session/manager.js';
 import { saveConversation } from '../../store/conversations.js';
+import { getAgentSessionByThread } from '../../store/agentSessions.js';
+import { initBrainMemory } from '../../store/brainMemory.js';
 import { getLocalDir } from '../../config/paths.js';
 import { loadConfig } from '../../config/index.js';
 import { truncateText, markdownToMrkdwn } from '../../utils/slackFormat.js';
@@ -75,6 +78,13 @@ export async function handleMessage(params: HandleMessageParams): Promise<void> 
       return;
     }
 
+    // Brain 메모리 디렉토리 초기화 (최초 1회 생성)
+    try {
+      initBrainMemory(cwd);
+    } catch (brainInitErr) {
+      logger.warn(`Brain 메모리 초기화 실패 (무시): ${brainInitErr}`);
+    }
+
     // 세션 관리 (channel 모드는 1회성 → 세션 스킵)
     let sessionId: string;
     let resumeId: string | undefined;
@@ -89,7 +99,22 @@ export async function handleMessage(params: HandleMessageParams): Promise<void> 
       sessionMessageCount = session.messageCount;
     }
 
-    logger.debug(`처리 시작 [${mode}]: "${inputText.slice(0, 50)}..."`);
+    // Brain/Sub Agent 라우팅: 활성 Sub Agent 세션이 있는지 확인
+    let activeSubAgent: ReturnType<typeof getAgentSessionByThread> = null;
+    if (mode !== 'channel') {
+      try {
+        const agentSession = getAgentSessionByThread(threadTs);
+        // Brain 세션이 아닌 활성 Sub Agent 세션만 대상
+        if (agentSession && agentSession.agentType !== 'brain') {
+          activeSubAgent = agentSession;
+          logger.debug(`활성 Sub Agent 세션 발견: ${agentSession.id} (${agentSession.agentType})`);
+        }
+      } catch (err) {
+        logger.warn(`Sub Agent 세션 조회 실패 (무시): ${err}`);
+      }
+    }
+
+    logger.debug(`처리 시작 [${mode}]: "${inputText.slice(0, 50)}..." → ${activeSubAgent ? 'Sub Agent 계속' : 'Brain Agent'}`);
 
     // 생각 중 메시지 실시간 업데이트 (channel 모드는 도구 없으므로 스킵)
     let onProgress: ((status: string) => void) | undefined;
@@ -138,19 +163,71 @@ export async function handleMessage(params: HandleMessageParams): Promise<void> 
       };
     }
 
-    // Claude Agent 호출
-    const response = await queryAgent({
-      prompt: effectiveInput,
-      cwd,
-      threadMessages,
-      sessionId,
-      resumeId,
-      isOwner,
-      attachments,
-      mode,
-      onProgress,
-      projectContext: projectResult.context ?? undefined,
-    });
+    // Agent 호출: Sub Agent 계속 vs Brain Agent 라우팅
+    let response: { text: string; toolsUsed: string[]; resumeId?: string };
+
+    if (activeSubAgent) {
+      // ── 활성 Sub Agent가 있으면 기존 queryAgent()로 대화 계속 ──
+      const subResumeId = activeSubAgent.resumeId || resumeId;
+      response = await queryAgent({
+        prompt: effectiveInput,
+        cwd,
+        threadMessages,
+        sessionId,
+        resumeId: subResumeId,
+        isOwner,
+        attachments,
+        mode,
+        onProgress,
+        projectContext: projectResult.context ?? undefined,
+      });
+    } else if (mode === 'channel') {
+      // ── channel 모드: 1회성 대화, Brain 불필요 → 기존 queryAgent() ──
+      response = await queryAgent({
+        prompt: effectiveInput,
+        cwd,
+        threadMessages,
+        sessionId,
+        resumeId,
+        isOwner,
+        attachments,
+        mode,
+        onProgress,
+        projectContext: projectResult.context ?? undefined,
+      });
+    } else {
+      // ── Brain Agent로 라우팅 (DM/Thread, Sub Agent 없음) ──
+      try {
+        const brainResult = await queryBrain({
+          prompt: effectiveInput,
+          cwd,
+          threadTs,
+          isOwner,
+          onProgress,
+        });
+        // Brain 결과를 공통 응답 형식으로 변환
+        response = {
+          text: brainResult.text,
+          toolsUsed: brainResult.toolsUsed,
+          resumeId: undefined, // Brain은 자체 세션 관리
+        };
+      } catch (brainErr) {
+        // Brain 실패 시 기존 queryAgent()로 폴백
+        logger.warn(`Brain Agent 호출 실패, Sub Agent로 폴백: ${brainErr instanceof Error ? brainErr.message : String(brainErr)}`);
+        response = await queryAgent({
+          prompt: effectiveInput,
+          cwd,
+          threadMessages,
+          sessionId,
+          resumeId,
+          isOwner,
+          attachments,
+          mode,
+          onProgress,
+          projectContext: projectResult.context ?? undefined,
+        });
+      }
+    }
 
     // 남은 타이머 정리
     if (updateTimer) clearTimeout(updateTimer);
