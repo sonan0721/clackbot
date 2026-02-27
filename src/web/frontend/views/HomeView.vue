@@ -76,6 +76,7 @@
 import { ref, onMounted } from 'vue'
 import { useBotStatus } from '../composables/useBotStatus'
 import { api } from '../composables/useApi'
+import { formatDate, activityLabel, activityBadgeClass } from '../utils/agentFormatters'
 import type {
   ConversationsResponse,
   ToolsResponse,
@@ -94,20 +95,6 @@ const recentActivities = ref<AgentActivityItem[]>([])
 function truncate(str: string | null | undefined, max: number): string {
   if (!str) return ''
   return str.length > max ? str.slice(0, max) + '...' : str
-}
-
-function formatDate(ts: number): string {
-  return new Date(ts).toLocaleString('ko-KR')
-}
-
-function activityLabel(type: string): string {
-  const map: Record<string, string> = { tool_use: '도구 사용', skill_invoke: '스킬 호출', agent_spawn: '에이전트 생성', memory_update: '메모리 업데이트' }
-  return map[type] || type
-}
-
-function activityBadgeClass(type: string): string {
-  const map: Record<string, string> = { tool_use: 'badge-builtin', skill_invoke: 'badge-plugin', agent_spawn: 'badge-active', memory_update: 'badge-error' }
-  return map[type] || 'badge-plugin'
 }
 
 onMounted(async () => {

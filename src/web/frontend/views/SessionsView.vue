@@ -85,6 +85,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { api } from '../composables/useApi'
+import { formatDate, activityLabel, activityBadgeClass } from '../utils/agentFormatters'
 import type { AgentSessionSummary, AgentSessionsResponse, AgentActivityItem } from '../types/api'
 
 const tabs = [
@@ -105,10 +106,6 @@ const expandedId = ref<string | null>(null)
 const activities = ref<AgentActivityItem[]>([])
 const detailLoading = ref(false)
 
-function formatDate(ts: number): string {
-  return new Date(ts).toLocaleString('ko-KR')
-}
-
 function statusLabel(status: string): string {
   const map: Record<string, string> = { active: '활성', completed: '완료', failed: '실패', expired: '만료' }
   return map[status] || status
@@ -117,16 +114,6 @@ function statusLabel(status: string): string {
 function statusBadgeClass(status: string): string {
   const map: Record<string, string> = { active: 'badge-active', completed: 'badge-builtin', failed: 'badge-error', expired: 'badge-plugin' }
   return map[status] || 'badge-plugin'
-}
-
-function activityLabel(type: string): string {
-  const map: Record<string, string> = { tool_use: '도구 사용', skill_invoke: '스킬 호출', agent_spawn: '에이전트 생성', memory_update: '메모리 업데이트' }
-  return map[type] || type
-}
-
-function activityBadgeClass(type: string): string {
-  const map: Record<string, string> = { tool_use: 'badge-builtin', skill_invoke: 'badge-plugin', agent_spawn: 'badge-active', memory_update: 'badge-error' }
-  return map[type] || 'badge-plugin'
 }
 
 function activityDotClass(type: string): string {

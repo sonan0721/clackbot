@@ -82,6 +82,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { api } from '../composables/useApi'
+import { formatDate, encodePath } from '../utils/agentFormatters'
 import type { BrainFileTree, BrainFileContent, BrainMemorySnapshot } from '../types/api'
 
 const files = ref<string[]>([])
@@ -93,10 +94,6 @@ const history = ref<BrainMemorySnapshot[]>([])
 const historyLoading = ref(false)
 const selectedHistoryContent = ref<string | null>(null)
 const selectedHistoryId = ref<number | null>(null)
-
-function formatDate(ts: number): string {
-  return new Date(ts).toLocaleString('ko-KR')
-}
 
 function truncate(str: string, max: number): string {
   if (!str) return ''
@@ -125,7 +122,7 @@ async function selectFile(filePath: string) {
   historyLoading.value = true
 
   try {
-    const data = await api<BrainFileContent>(`/api/memory/brain/${encodeURIComponent(filePath)}`)
+    const data = await api<BrainFileContent>(`/api/memory/brain/${encodePath(filePath)}`)
     fileContent.value = data.content
   } catch {
     fileContent.value = '(파일을 불러올 수 없습니다.)'
@@ -134,7 +131,7 @@ async function selectFile(filePath: string) {
   }
 
   try {
-    const data = await api<BrainMemorySnapshot[]>(`/api/memory/brain/${encodeURIComponent(filePath)}/history`)
+    const data = await api<BrainMemorySnapshot[]>(`/api/memory/brain/${encodePath(filePath)}/history`)
     history.value = data
   } catch {
     history.value = []
