@@ -72,6 +72,57 @@ export function initDatabase(cwd?: string): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_sv_messages_session ON supervisor_messages(session_id);
   `);
 
+  // agent_sessions — Brain + Sub Agent 세션 추적
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS agent_sessions (
+      id TEXT PRIMARY KEY,
+      thread_ts TEXT,
+      agent_type TEXT NOT NULL,
+      skill_used TEXT,
+      status TEXT DEFAULT 'active',
+      resume_id TEXT,
+      task_description TEXT,
+      assigned_channels TEXT,
+      cwd TEXT,
+      message_count INTEGER DEFAULT 0,
+      tools_used TEXT,
+      created_at INTEGER,
+      last_active_at INTEGER,
+      completed_at INTEGER,
+      result_summary TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_sessions_thread ON agent_sessions(thread_ts);
+    CREATE INDEX IF NOT EXISTS idx_agent_sessions_status ON agent_sessions(status);
+  `);
+
+  // agent_activities — 활동 타임라인
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS agent_activities (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id TEXT REFERENCES agent_sessions(id),
+      agent_type TEXT NOT NULL,
+      activity_type TEXT NOT NULL,
+      tool_name TEXT,
+      detail TEXT,
+      channel_id TEXT,
+      created_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_activities_session ON agent_activities(session_id);
+    CREATE INDEX IF NOT EXISTS idx_activities_created ON agent_activities(created_at);
+  `);
+
+  // memory_snapshots — 메모리 변경 이력
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS memory_snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      file_path TEXT NOT NULL,
+      content TEXT NOT NULL,
+      changed_by TEXT,
+      created_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_snapshots_file ON memory_snapshots(file_path);
+  `);
+
   logger.debug(`대화 DB 초기화: ${dbPath}`);
   return db;
 }
