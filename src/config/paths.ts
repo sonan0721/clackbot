@@ -77,6 +77,16 @@ export function getSkillsDir(cwd?: string): string {
   return path.join(getProjectRoot(cwd), '.claude', 'skills');
 }
 
+/** Brain 메모리 디렉토리 */
+export function getBrainDir(cwd?: string): string {
+  return path.join(getLocalDir(cwd), 'brain');
+}
+
+/** Brain 메모리 파일 경로 */
+export function getBrainFilePath(cwd: string, fileName: string): string {
+  return path.join(getBrainDir(cwd), fileName);
+}
+
 /** .env 파일 경로 */
 export function getEnvPath(cwd: string = process.cwd()): string {
   return path.join(cwd, '.env');
