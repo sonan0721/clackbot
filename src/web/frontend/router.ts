@@ -14,9 +14,19 @@ const router = createRouter({
       component: () => import('./views/ConversationsView.vue'),
     },
     {
+      path: '/sessions',
+      name: 'sessions',
+      component: () => import('./views/SessionsView.vue'),
+    },
+    {
       path: '/tools',
       name: 'tools',
       component: () => import('./views/ToolsView.vue'),
+    },
+    {
+      path: '/brain-memory',
+      name: 'brain-memory',
+      component: () => import('./views/BrainMemoryView.vue'),
     },
     {
       path: '/projects',

@@ -151,3 +151,63 @@ export interface ProjectContextPreview {
   claudeMd: string | null
   memory: string | null
 }
+
+// Agent session types (for dashboard)
+export interface AgentSessionSummary {
+  id: string
+  threadTs?: string
+  agentType: string
+  skillUsed?: string
+  status: 'active' | 'completed' | 'failed' | 'expired'
+  taskDescription?: string
+  messageCount: number
+  toolsUsed: string[]
+  createdAt: number
+  lastActiveAt: number
+  completedAt?: number
+}
+
+export interface AgentActivityItem {
+  id: number
+  sessionId: string
+  agentType: string
+  activityType: 'tool_use' | 'skill_invoke' | 'agent_spawn' | 'memory_update'
+  toolName?: string
+  detail?: Record<string, unknown>
+  channelId?: string
+  createdAt: number
+}
+
+export interface AgentSessionsResponse {
+  sessions: AgentSessionSummary[]
+  total: number
+}
+
+export interface BrainFileTree {
+  files: string[]
+}
+
+export interface BrainFileContent {
+  path: string
+  content: string
+}
+
+export interface BrainMemorySnapshot {
+  id: number
+  content: string
+  changed_by: string
+  created_at: number
+}
+
+export interface AgentDefinition {
+  file: string
+  name: string
+  description: string
+  tools?: string
+  model?: string
+}
+
+export interface SkillDefinition {
+  name: string
+  description: string
+}
