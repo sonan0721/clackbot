@@ -7,8 +7,10 @@ import { loadConfig } from '../../config/index.js';
 import { loadPlugins } from '../../plugins/registry.js';
 import { slackPostTool } from './builtin/slackPost.js';
 import { slackReadChannelTool } from './builtin/slackReadChannel.js';
+import { slackReadThreadTool } from './builtin/slackReadThread.js';
 import { slackSendDmTool } from './builtin/slackSendDm.js';
 import { memoryReadTool, memoryWriteTool } from './builtin/memory.js';
+import { brainTools, setBrainCwd } from './builtin/brainMemory.js';
 import { logger } from '../../utils/logger.js';
 
 // 플러그인 JSON 로더 — .clackbot/tools/*.json → MCP 도구 변환
@@ -206,11 +208,16 @@ export type McpServerConfig =
 export function getMcpServers(cwd?: string): Record<string, McpServerConfig> {
   const servers: Record<string, McpServerConfig> = {};
 
+  // Brain 도구에 cwd 설정
+  if (cwd) {
+    setBrainCwd(cwd);
+  }
+
   // 내장 도구 서버 (SDK 내부 MCP로 등록)
   servers['_builtin'] = createSdkMcpServer({
     name: 'clackbot-builtin',
     version: '1.0.0',
-    tools: [slackPostTool, slackReadChannelTool, slackSendDmTool, memoryReadTool, memoryWriteTool],
+    tools: [slackPostTool, slackReadChannelTool, slackReadThreadTool, slackSendDmTool, memoryReadTool, memoryWriteTool, ...brainTools],
   });
 
   // config.mcpServers에서 MCP 서버 로드 (stdio/sse/http)
