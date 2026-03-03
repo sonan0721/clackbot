@@ -1,18 +1,36 @@
-import React from "react";
-import ReactDOM from "react-dom/client";
-import "./globals.css";
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { createHashRouter, RouterProvider } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import App from './App';
+import './globals.css';
 
-function App() {
-  return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold">Clackbot 대시보드</h1>
-      <p className="text-muted-foreground mt-2">React + shadcn/ui 마이그레이션 완료</p>
-    </div>
-  );
-}
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { staleTime: 30_000, retry: 1 },
+  },
+});
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
+const router = createHashRouter([
+  {
+    path: '/',
+    element: <App />,
+    children: [
+      { index: true, lazy: () => import('./pages/Dashboard').then(m => ({ Component: m.default })) },
+      { path: 'projects/:name/sessions', lazy: () => import('./pages/Sessions').then(m => ({ Component: m.default })) },
+      { path: 'projects/:name/memory', lazy: () => import('./pages/Memory').then(m => ({ Component: m.default })) },
+      { path: 'projects/:name/conversations', lazy: () => import('./pages/Conversations').then(m => ({ Component: m.default })) },
+      { path: 'tools', lazy: () => import('./pages/Tools').then(m => ({ Component: m.default })) },
+      { path: 'activity', lazy: () => import('./pages/ActivityLog').then(m => ({ Component: m.default })) },
+      { path: 'settings', lazy: () => import('./pages/Settings').then(m => ({ Component: m.default })) },
+    ],
+  },
+]);
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
   </React.StrictMode>
 );
