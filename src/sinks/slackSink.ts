@@ -2,7 +2,7 @@
 
 import type { WebClient } from '@slack/web-api';
 import type { EventBus } from '../events/eventBus.js';
-import type { EventMap, StreamData } from '../events/types.js';
+import type { EventMap } from '../events/types.js';
 import { markdownToMrkdwn, truncateText } from '../utils/slackFormat.js';
 
 interface SessionState {
