@@ -9,11 +9,23 @@ import { checkProjectStatus, loadProjectContext } from '../../agent/projectConte
 
 const router = Router();
 
-// 디렉토리 브라우저 — 폴더 선택 UI용
+/** 경로가 홈 디렉토리 이하인지 검증 */
+function isWithinHome(targetPath: string): boolean {
+  const home = os.homedir();
+  const resolved = path.resolve(targetPath);
+  return resolved === home || resolved.startsWith(home + path.sep);
+}
+
+// 디렉토리 브라우저 — 폴더 선택 UI용 (홈 디렉토리 이하로 제한)
 router.get('/browse', (req, res) => {
   const dirPath = typeof req.query.path === 'string' && req.query.path
     ? path.resolve(req.query.path)
     : os.homedir();
+
+  if (!isWithinHome(dirPath)) {
+    res.status(403).json({ error: '홈 디렉토리 외부는 탐색할 수 없습니다.' });
+    return;
+  }
 
   try {
     if (!fs.existsSync(dirPath) || !fs.statSync(dirPath).isDirectory()) {
@@ -34,7 +46,8 @@ router.get('/browse', (req, res) => {
 
     res.json({
       current: dirPath,
-      parent: parent !== dirPath ? parent : null,
+      // 홈 디렉토리 위로는 올라갈 수 없음
+      parent: parent !== dirPath && isWithinHome(parent) ? parent : null,
       dirs,
       hasClaudeMd,
       hasGit,
@@ -44,7 +57,7 @@ router.get('/browse', (req, res) => {
   }
 });
 
-// 새 폴더 생성 — 디렉토리 브라우저 내
+// 새 폴더 생성 — 디렉토리 브라우저 내 (홈 디렉토리 이하로 제한)
 router.post('/browse/mkdir', (req, res) => {
   const { parentPath, name } = req.body;
 
@@ -53,12 +66,17 @@ router.post('/browse/mkdir', (req, res) => {
     return;
   }
 
-  if (/[/\\]/.test(name)) {
-    res.status(400).json({ error: '폴더명에 슬래시를 포함할 수 없습니다.' });
+  if (/[/\\]/.test(name) || name.includes('..')) {
+    res.status(400).json({ error: '폴더명에 슬래시나 ..를 포함할 수 없습니다.' });
     return;
   }
 
   const resolved = path.resolve(parentPath, name);
+  if (!isWithinHome(resolved)) {
+    res.status(403).json({ error: '홈 디렉토리 외부에는 폴더를 생성할 수 없습니다.' });
+    return;
+  }
+
   if (fs.existsSync(resolved)) {
     res.status(409).json({ error: '이미 존재하는 폴더입니다.' });
     return;

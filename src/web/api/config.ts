@@ -21,9 +21,10 @@ router.get('/', (_req, res) => {
   const botToken = config.slack.botToken || process.env.SLACK_BOT_TOKEN;
   const appToken = config.slack.appToken || process.env.SLACK_APP_TOKEN;
 
-  // 민감 정보 마스킹
+  // 민감 정보 마스킹 + 제거
+  const { dashboardToken: _token, ...configWithoutToken } = config;
   const safeConfig = {
-    ...config,
+    ...configWithoutToken,
     slack: {
       ...config.slack,
       botUserId: maskSecret(config.slack.botUserId),
@@ -96,7 +97,8 @@ router.put('/', (req, res) => {
     }
 
     saveConfig(config);
-    res.json({ message: '설정이 저장되었습니다.', config });
+    // 응답에서 민감 정보 제거
+    res.json({ message: '설정이 저장되었습니다.' });
   } catch (error) {
     res.status(500).json({ error: '설정 저장 실패' });
   }

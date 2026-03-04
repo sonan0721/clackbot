@@ -20,7 +20,8 @@ export function useWebSocket(onMessage: MessageHandler) {
 
     function connect() {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+      const token = (window as unknown as Record<string, string>).__DASHBOARD_TOKEN__ ?? '';
+      ws = new WebSocket(`${protocol}//${window.location.host}/ws?token=${encodeURIComponent(token)}`);
       wsRef.current = ws;
 
       ws.onopen = () => setConnected(true);

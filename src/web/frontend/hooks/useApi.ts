@@ -1,8 +1,17 @@
 import { useQuery, useMutation, useQueryClient, type UseQueryOptions } from '@tanstack/react-query';
 
+/** 서버에서 주입한 대시보드 토큰 */
+function getDashboardToken(): string {
+  return (window as unknown as Record<string, string>).__DASHBOARD_TOKEN__ ?? '';
+}
+
 async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(path, {
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${getDashboardToken()}`,
+      ...options?.headers,
+    },
     ...options,
   });
   if (!res.ok) {

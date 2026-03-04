@@ -24,6 +24,9 @@ export const ConfigSchema = z.object({
   // 웹 대시보드 포트
   webPort: z.number().int().min(1).max(65535).default(3847),
 
+  // 대시보드 API 인증 토큰 (자동 생성)
+  dashboardToken: z.string().optional(),
+
   // 성격 프리셋
   personality: z.object({
     preset: z.enum([

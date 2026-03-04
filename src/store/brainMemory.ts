@@ -6,7 +6,7 @@ import {
   readdirSync,
   statSync,
 } from 'fs';
-import { join, relative, dirname } from 'path';
+import { join, relative, dirname, resolve } from 'path';
 import { getBrainDir, getBrainFilePath } from '../config/paths.js';
 import { initDatabase } from './conversations.js';
 
@@ -39,9 +39,19 @@ export function initBrainMemory(cwd: string): void {
   }
 }
 
+/** Brain 파일 경로가 brain 디렉토리 내인지 검증 */
+export function validateBrainPath(cwd: string, fileName: string): string {
+  const brainDir = resolve(getBrainDir(cwd));
+  const filePath = resolve(getBrainFilePath(cwd, fileName));
+  if (!filePath.startsWith(brainDir + '/') && filePath !== brainDir) {
+    throw new Error('경로 탈출 시도가 감지되었습니다.');
+  }
+  return filePath;
+}
+
 /** Brain 파일 읽기 (없으면 빈 문자열 반환) */
 export function readBrainFile(cwd: string, fileName: string): string {
-  const filePath = getBrainFilePath(cwd, fileName);
+  const filePath = validateBrainPath(cwd, fileName);
   if (!existsSync(filePath)) {
     return '';
   }
@@ -55,7 +65,7 @@ export function writeBrainFile(
   content: string,
   changedBy: string,
 ): void {
-  const filePath = getBrainFilePath(cwd, fileName);
+  const filePath = validateBrainPath(cwd, fileName);
 
   // 하위 디렉토리가 없으면 생성
   const dir = dirname(filePath);

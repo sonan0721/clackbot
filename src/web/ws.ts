@@ -1,7 +1,9 @@
 // WebSocket 서버 — EventBus 이벤트를 클라이언트에 브로드캐스트
 
 import { WebSocketServer, WebSocket } from 'ws';
-import type { Server } from 'node:http';
+import type { Server, IncomingMessage } from 'node:http';
+import { URL } from 'node:url';
+import { loadConfig } from '../config/index.js';
 import { getEventBus } from '../events/eventBus.js';
 import { handleWebSocketMessage } from '../sources/webSocketSource.js';
 import { logger } from '../utils/logger.js';
@@ -13,7 +15,18 @@ export function setupWebSocket(server: Server): WebSocketServer {
   wss = new WebSocketServer({ server, path: '/ws' });
   const bus = getEventBus();
 
-  wss.on('connection', (ws) => {
+  wss.on('connection', (ws, req: IncomingMessage) => {
+    // WebSocket 토큰 인증
+    const config = loadConfig();
+    if (config.dashboardToken) {
+      const url = new URL(req.url ?? '', `http://${req.headers.host}`);
+      const token = url.searchParams.get('token');
+      if (token !== config.dashboardToken) {
+        logger.warn('[WebSocket] 인증 실패 — 연결 거부');
+        ws.close(4001, '인증 실패');
+        return;
+      }
+    }
     logger.info('[WebSocket] 클라이언트 연결됨');
 
     ws.on('message', (raw) => {

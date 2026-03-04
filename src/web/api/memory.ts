@@ -47,10 +47,50 @@ router.put('/', (req, res) => {
 
 // ─── Brain 메모리 API ───
 
+interface FileTreeNode {
+  name: string;
+  type: 'file' | 'directory';
+  path: string;
+  children?: FileTreeNode[];
+}
+
+/** 플랫 경로 배열을 트리 구조로 변환 */
+function buildFileTree(paths: string[]): FileTreeNode[] {
+  const root: FileTreeNode[] = [];
+
+  for (const filePath of paths) {
+    const parts = filePath.split('/');
+    let current = root;
+
+    for (let i = 0; i < parts.length; i++) {
+      const name = parts[i];
+      const currentPath = parts.slice(0, i + 1).join('/');
+      const isFile = i === parts.length - 1;
+
+      let existing = current.find(n => n.name === name);
+      if (!existing) {
+        existing = {
+          name,
+          type: isFile ? 'file' : 'directory',
+          path: currentPath,
+          ...(isFile ? {} : { children: [] }),
+        };
+        current.push(existing);
+      }
+      if (!isFile) {
+        current = existing.children!;
+      }
+    }
+  }
+
+  return root;
+}
+
 // 메모리 파일 트리
 router.get('/brain', (_req, res) => {
   const cwd = getLocalDir();
-  const files = listBrainFiles(cwd);
+  const flatFiles = listBrainFiles(cwd);
+  const files = buildFileTree(flatFiles);
   res.json({ files });
 });
 
@@ -90,6 +130,16 @@ router.put('/brain/:path(*)', (req, res) => {
 // 메모리 파일 내용 또는 변경 이력
 router.get('/brain/:path(*)', (req, res) => {
   const brainPath = (req.params as Record<string, string>)['path'];
+
+  // 경로 탈출 방지
+  const cwd = getLocalDir();
+  const brainDir = path.resolve(path.join(cwd, 'brain'));
+  const resolved = path.resolve(path.join(brainDir, brainPath.replace(/\/history$/, '')));
+  if (!resolved.startsWith(brainDir + '/') && resolved !== brainDir) {
+    res.status(400).json({ error: '잘못된 경로입니다.' });
+    return;
+  }
+
   // /history 접미사 → 변경 이력 조회
   if (brainPath.endsWith('/history')) {
     const filePath = brainPath.replace(/\/history$/, '');
@@ -97,7 +147,6 @@ router.get('/brain/:path(*)', (req, res) => {
     res.json(history);
     return;
   }
-  const cwd = getLocalDir();
   const content = readBrainFile(cwd, brainPath);
   res.json({ path: brainPath, content });
 });

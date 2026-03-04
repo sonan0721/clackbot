@@ -194,8 +194,10 @@ export function getAllSessions(options?: {
   }
 
   if (project) {
-    conditions.push('cwd LIKE ?');
-    params.push(`%${project}%`);
+    // LIKE 와일드카드 이스케이프
+    const escaped = project.replace(/[%_\\]/g, '\\$&');
+    conditions.push("cwd LIKE ? ESCAPE '\\'");
+    params.push(`%${escaped}%`);
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';

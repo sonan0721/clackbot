@@ -75,6 +75,9 @@ export async function handleMessage(params: HandleMessageParams): Promise<void> 
     logger.warn(`생각 중 메시지 전송 실패: ${error}`);
   }
 
+  let slackSink: SlackSink | undefined;
+  let updateTimer: ReturnType<typeof setTimeout> | null = null;
+
   try {
     const cwd = getLocalDir();
 
@@ -121,7 +124,6 @@ export async function handleMessage(params: HandleMessageParams): Promise<void> 
     }
 
     // SlackSink: 실시간 스트리밍 업데이트 시작
-    let slackSink: SlackSink | undefined;
     if (thinkingTs && mode !== 'channel') {
       slackSink = new SlackSink(bus, client);
       slackSink.startSession(sessionId, channelId, thinkingTs);
@@ -146,7 +148,6 @@ export async function handleMessage(params: HandleMessageParams): Promise<void> 
 
     // 생각 중 메시지 실시간 업데이트 (channel 모드는 도구 없으므로 스킵)
     let onProgress: ((status: string) => void) | undefined;
-    let updateTimer: ReturnType<typeof setTimeout> | null = null;
     const showProgress = handlerConfig.personality?.showProgress !== false;
 
     if (mode !== 'channel' && showProgress) {
@@ -343,6 +344,10 @@ export async function handleMessage(params: HandleMessageParams): Promise<void> 
     logger.debug('응답 전송 완료');
 
   } catch (error) {
+    // 에러 시에도 SlackSink 리스너 정리
+    if (slackSink) slackSink.dispose();
+    if (updateTimer) clearTimeout(updateTimer);
+
     logger.error(`메시지 처리 실패: ${error instanceof Error ? error.message : String(error)}`);
 
     const errorText = '죄송합니다. 메시지 처리 중 오류가 발생했습니다.';

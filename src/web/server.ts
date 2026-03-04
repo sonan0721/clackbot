@@ -1,7 +1,9 @@
+import crypto from 'node:crypto';
 import express from 'express';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadConfig } from '../config/index.js';
+import { loadConfig, saveConfig } from '../config/index.js';
 import { APP_VERSION } from '../config/paths.js';
 import { logger } from '../utils/logger.js';
 import { setupWebSocket } from './ws.js';
@@ -17,22 +19,54 @@ import sessionsRouter from './api/sessions.js';
 import activitiesRouter from './api/activities.js';
 import agentsRouter from './api/agents.js';
 
+import type { Request, Response, NextFunction } from 'express';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+/** 대시보드 토큰 확보 (없으면 자동 생성) */
+function ensureDashboardToken(): string {
+  const config = loadConfig();
+  if (config.dashboardToken) return config.dashboardToken;
+
+  const token = crypto.randomBytes(32).toString('hex');
+  config.dashboardToken = token;
+  saveConfig(config);
+  return token;
+}
 
 // Express 웹 대시보드 서버
 
 export function createWebServer() {
   const app = express();
+  const dashboardToken = ensureDashboardToken();
 
   // JSON 파싱
   app.use(express.json());
 
-  // CORS (로컬 개발용)
-  app.use((_req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
-    res.header('Access-Control-Allow-Headers', 'Content-Type');
+  // CORS — localhost만 허용
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const origin = req.headers.origin;
+    if (origin && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+      res.header('Access-Control-Allow-Origin', origin);
+      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
+      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      res.header('Access-Control-Allow-Credentials', 'true');
+    }
+    if (req.method === 'OPTIONS') {
+      res.sendStatus(204);
+      return;
+    }
     next();
+  });
+
+  // API 인증 미들웨어 — Bearer token 검증
+  app.use('/api', (req: Request, res: Response, next: NextFunction) => {
+    const auth = req.headers.authorization;
+    if (auth === `Bearer ${dashboardToken}`) {
+      next();
+      return;
+    }
+    res.status(401).json({ error: '인증이 필요합니다.' });
   });
 
   // API 라우트
@@ -63,9 +97,20 @@ export function createWebServer() {
   const publicDir = path.resolve(__dirname, 'public');
   app.use(express.static(publicDir));
 
-  // SPA 라우팅 — 모든 경로에서 index.html 반환
+  // SPA 라우팅 — index.html에 토큰 주입
   app.get('*', (_req, res) => {
-    res.sendFile(path.join(publicDir, 'index.html'));
+    const indexPath = path.join(publicDir, 'index.html');
+    try {
+      let html = fs.readFileSync(indexPath, 'utf-8');
+      // <head> 직후에 토큰 스크립트 주입
+      html = html.replace(
+        '<head>',
+        `<head><script>window.__DASHBOARD_TOKEN__="${dashboardToken}";</script>`,
+      );
+      res.type('html').send(html);
+    } catch {
+      res.sendFile(indexPath);
+    }
   });
 
   return app;
@@ -75,11 +120,13 @@ export function createWebServer() {
 export function startWebServer(port: number): Promise<void> {
   return new Promise((resolve, reject) => {
     const app = createWebServer();
+    const token = ensureDashboardToken();
 
     const server = app.listen(port, () => {
       setupWebSocket(server);
       setupMessageHandler();
       logger.success(`웹 대시보드: http://localhost:${port}`);
+      logger.info(`대시보드 인증 토큰: ${token.slice(0, 8)}...`);
       resolve();
     });
 
