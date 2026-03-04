@@ -40,6 +40,7 @@ export default function Conversations() {
   const [page, setPage] = useState(0);
   const [selectedThread, setSelectedThread] = useState<string | null>(null);
   const [chatInput, setChatInput] = useState('');
+  const [optimisticMessages, setOptimisticMessages] = useState<Array<{ text: string; timestamp: string }>>([]);
   const { connected, send } = useAgentStreams();
   const chatScrollRef = useRef<HTMLDivElement>(null);
 
@@ -77,7 +78,13 @@ export default function Conversations() {
 
   const handleChatSend = () => {
     if (!chatInput.trim() || !connected || !selectedThread) return;
-    send({ type: 'chat:send', text: chatInput.trim(), threadTs: selectedThread });
+    const text = chatInput.trim();
+    // 즉시 로컬 표시
+    setOptimisticMessages(prev => [...prev, {
+      text,
+      timestamp: new Date().toISOString(),
+    }]);
+    send({ type: 'chat:send', text, threadTs: selectedThread });
     setChatInput('');
   };
 
@@ -88,10 +95,17 @@ export default function Conversations() {
     }
   };
 
+  // API 데이터 갱신 시 optimistic 메시지 제거
+  useEffect(() => {
+    if (messages.length > 0) {
+      setOptimisticMessages([]);
+    }
+  }, [messages]);
+
   // 메시지 변경 시 자동 스크롤
   useEffect(() => {
     chatScrollRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, optimisticMessages]);
 
   // 채팅 상세 보기
   if (selectedThread) {
@@ -104,7 +118,7 @@ export default function Conversations() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => { setSelectedThread(null); setChatInput(''); }}
+              onClick={() => { setSelectedThread(null); setChatInput(''); setOptimisticMessages([]); }}
             >
               <ChevronLeft className="h-4 w-4" />
               목록으로
@@ -119,7 +133,7 @@ export default function Conversations() {
                   <Skeleton key={i} className="h-24 w-full" />
                 ))}
               </div>
-            ) : messages.length === 0 ? (
+            ) : messages.length === 0 && optimisticMessages.length === 0 ? (
               <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
                 메시지가 없습니다
               </div>
@@ -180,6 +194,32 @@ export default function Conversations() {
                     )}
                   </div>
                 ))}
+                {/* 낙관적 메시지 (전송 즉시 표시) */}
+                {optimisticMessages.map((om, idx) => (
+                  <div key={`opt-${idx}`} className="flex justify-end">
+                    <div className="max-w-[75%]">
+                      <div className="flex items-center justify-end gap-2 mb-1">
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">Web</Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {formatDate(om.timestamp)}
+                        </span>
+                        <User className="h-3.5 w-3.5 text-muted-foreground" />
+                      </div>
+                      <div className="rounded-lg bg-primary text-primary-foreground px-4 py-2.5 text-sm whitespace-pre-wrap">
+                        {om.text}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {/* 응답 대기 표시 */}
+                {optimisticMessages.length > 0 && (
+                  <div className="flex justify-start">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Bot className="h-3.5 w-3.5 animate-pulse" />
+                      <span>응답 생성 중...</span>
+                    </div>
+                  </div>
+                )}
                 <div ref={chatScrollRef} />
               </div>
             )}
