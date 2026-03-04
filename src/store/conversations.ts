@@ -253,30 +253,44 @@ export function getConversationSessions(options: {
   limit?: number;
   offset?: number;
   search?: string;
+  projectId?: string;
 }): { sessions: SessionSummary[]; total: number } {
   const database = initDatabase();
-  const { limit = 20, offset = 0, search } = options;
+  const { limit = 20, offset = 0, search, projectId } = options;
 
-  // 검색 조건이 있으면 해당 thread_ts만 필터
-  let threadFilter = '';
-  const params: unknown[] = [];
+  // 필터 조건 구성
+  const conditions: string[] = [];
+  const countParams: unknown[] = [];
 
   if (search) {
-    threadFilter = `WHERE thread_ts IN (
-      SELECT DISTINCT thread_ts FROM conversations
-      WHERE input_text LIKE ? OR output_text LIKE ?
-    )`;
+    conditions.push('(input_text LIKE ? OR output_text LIKE ?)');
     const searchPattern = `%${search}%`;
-    params.push(searchPattern, searchPattern);
+    countParams.push(searchPattern, searchPattern);
   }
+
+  if (projectId) {
+    conditions.push('project_id = ?');
+    countParams.push(projectId);
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
   // 전체 세션 수
   const countRow = database.prepare(
-    `SELECT COUNT(DISTINCT thread_ts) as count FROM conversations ${
-      search ? 'WHERE input_text LIKE ? OR output_text LIKE ?' : ''
-    }`
-  ).get(...(search ? [`%${search}%`, `%${search}%`] : [])) as { count: number };
+    `SELECT COUNT(DISTINCT thread_ts) as count FROM conversations ${whereClause}`
+  ).get(...countParams) as { count: number };
   const total = countRow.count;
+
+  // 그룹 쿼리용 threadFilter 구성
+  let threadFilter = '';
+  const params: unknown[] = [];
+
+  if (conditions.length > 0) {
+    threadFilter = `WHERE thread_ts IN (
+      SELECT DISTINCT thread_ts FROM conversations ${whereClause}
+    )`;
+    params.push(...countParams);
+  }
 
   // 세션 목록
   const rows = database.prepare(`

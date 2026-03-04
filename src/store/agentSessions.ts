@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { initDatabase } from './conversations.js';
+import { getEventBus } from '../events/eventBus.js';
 
 // ─── Agent 세션 & 활동 CRUD ───
 
@@ -174,14 +175,15 @@ export function getActiveSessions(): AgentSession[] {
   return rows.map(rowToSession);
 }
 
-/** 세션 목록 조회 (페이지네이션 + 상태 필터) */
+/** 세션 목록 조회 (페이지네이션 + 상태/프로젝트 필터) */
 export function getAllSessions(options?: {
   status?: string;
+  project?: string;
   limit?: number;
   offset?: number;
 }): { items: AgentSession[]; total: number } {
   const database = initDatabase();
-  const { status, limit = 50, offset = 0 } = options ?? {};
+  const { status, project, limit = 50, offset = 0 } = options ?? {};
 
   const conditions: string[] = [];
   const params: unknown[] = [];
@@ -189,6 +191,11 @@ export function getAllSessions(options?: {
   if (status) {
     conditions.push('status = ?');
     params.push(status);
+  }
+
+  if (project) {
+    conditions.push('cwd LIKE ?');
+    params.push(`%${project}%`);
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -287,7 +294,7 @@ export function logActivity(params: LogActivityParams): AgentActivity {
     now,
   );
 
-  return {
+  const activity = {
     id: Number(result.lastInsertRowid),
     sessionId: params.sessionId,
     agentType: params.agentType,
@@ -297,6 +304,15 @@ export function logActivity(params: LogActivityParams): AgentActivity {
     channelId: params.channelId,
     createdAt: now,
   };
+
+  // EventBus로 실시간 브로드캐스트
+  try {
+    getEventBus().emit('activity:new', { activity });
+  } catch {
+    // EventBus 미초기화 시 무시
+  }
+
+  return activity;
 }
 
 /** 세션의 활동 목록 조회 (시간순) */

@@ -44,6 +44,34 @@ router.get('/browse', (req, res) => {
   }
 });
 
+// 새 폴더 생성 — 디렉토리 브라우저 내
+router.post('/browse/mkdir', (req, res) => {
+  const { parentPath, name } = req.body;
+
+  if (!parentPath || !name || typeof parentPath !== 'string' || typeof name !== 'string') {
+    res.status(400).json({ error: '경로와 폴더명을 입력하세요.' });
+    return;
+  }
+
+  if (/[/\\]/.test(name)) {
+    res.status(400).json({ error: '폴더명에 슬래시를 포함할 수 없습니다.' });
+    return;
+  }
+
+  const resolved = path.resolve(parentPath, name);
+  if (fs.existsSync(resolved)) {
+    res.status(409).json({ error: '이미 존재하는 폴더입니다.' });
+    return;
+  }
+
+  try {
+    fs.mkdirSync(resolved, { recursive: true });
+    res.status(201).json({ path: resolved });
+  } catch {
+    res.status(500).json({ error: '폴더 생성 실패' });
+  }
+});
+
 // 프로젝트 목록 조회
 router.get('/', (_req, res) => {
   const config = loadConfig();

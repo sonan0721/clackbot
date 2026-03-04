@@ -1,5 +1,7 @@
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PersonalityEditor } from '@/components/settings/PersonalityEditor';
+import { SessionSettings } from '@/components/settings/SessionSettings';
+import { OwnerSettings } from '@/components/settings/OwnerSettings';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useBotStatus } from '@/hooks/useBotStatus';
@@ -19,6 +21,12 @@ export default function Settings() {
       <div className="mx-auto max-w-2xl space-y-6 p-6">
         {/* 성격 프리셋 에디터 */}
         <PersonalityEditor />
+
+        {/* 세션 설정 */}
+        <SessionSettings />
+
+        {/* 소유자 설정 */}
+        <OwnerSettings />
 
         {/* 연결 정보 (읽기 전용) */}
         <Card>

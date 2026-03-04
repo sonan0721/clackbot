@@ -16,9 +16,10 @@ export default function Sessions() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const queryParam = statusFilter === 'all' ? '' : `&status=${statusFilter}`;
+  const projectParam = name ? `&project=${encodeURIComponent(name)}` : '';
   const { data, isLoading } = useApiQuery<AgentSessionsResponse>(
-    ['sessions', statusFilter],
-    `/api/sessions?limit=50${queryParam}`,
+    ['sessions', statusFilter, name ?? ''],
+    `/api/sessions?limit=50${queryParam}${projectParam}`,
   );
 
   const sessions = data?.sessions ?? [];

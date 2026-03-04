@@ -64,6 +64,7 @@ export interface SessionSummary {
   firstMessage: string;
   messageCount: number;
   lastMessageAt: string;
+  lastAt: string;
 }
 
 export interface Message {

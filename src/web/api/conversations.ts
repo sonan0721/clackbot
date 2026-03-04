@@ -10,8 +10,9 @@ router.get('/', (req, res) => {
   const limit = parseInt(req.query.limit as string, 10) || 20;
   const offset = parseInt(req.query.offset as string, 10) || 0;
   const search = req.query.search as string | undefined;
+  const projectId = req.query.project as string | undefined;
 
-  const result = getConversationSessions({ limit, offset, search });
+  const result = getConversationSessions({ limit, offset, search, projectId });
   res.json(result);
 });
 

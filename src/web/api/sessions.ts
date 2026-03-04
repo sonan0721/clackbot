@@ -10,12 +10,13 @@ import {
 
 const router = Router();
 
-// 세션 목록 (페이지네이션 + 상태 필터)
+// 세션 목록 (페이지네이션 + 상태/프로젝트 필터)
 router.get('/', (req, res) => {
   const status = req.query.status as string | undefined;
+  const project = req.query.project as string | undefined;
   const limit = parseInt(req.query.limit as string, 10) || 50;
   const offset = parseInt(req.query.offset as string, 10) || 0;
-  const result = getAllSessions({ status, limit, offset });
+  const result = getAllSessions({ status, project, limit, offset });
   res.json(result);
 });
 

@@ -52,16 +52,18 @@ export default function Conversations() {
 
   const offset = page * PAGE_SIZE;
   const searchParam = debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : '';
+  const projectParam = name ? `&project=${encodeURIComponent(name)}` : '';
 
   const { data, isLoading } = useApiQuery<ConversationsResponse>(
-    ['conversations', String(page), debouncedSearch],
-    `/api/conversations?limit=${PAGE_SIZE}&offset=${offset}${searchParam}`,
+    ['conversations', String(page), debouncedSearch, name ?? ''],
+    `/api/conversations?limit=${PAGE_SIZE}&offset=${offset}${searchParam}${projectParam}`,
+    { staleTime: 5_000 },
   );
 
   const { data: threadData, isLoading: threadLoading } = useApiQuery<MessagesResponse>(
     ['conversation-thread', selectedThread ?? ''],
     `/api/conversations/${encodeURIComponent(selectedThread ?? '')}`,
-    { enabled: !!selectedThread },
+    { enabled: !!selectedThread, staleTime: 5_000 },
   );
 
   const sessions = data?.sessions ?? [];
@@ -194,7 +196,7 @@ export default function Conversations() {
             {sessions.map((session) => (
               <Card
                 key={session.threadTs}
-                className="cursor-pointer transition-colors hover:bg-accent/50"
+                className="cursor-pointer transition-colors hover:bg-accent/50 animate-in slide-in-from-top-1 fade-in duration-200"
                 onClick={() => setSelectedThread(session.threadTs)}
               >
                 <CardContent className="flex items-center justify-between py-3">
@@ -203,7 +205,7 @@ export default function Conversations() {
                       {truncate(session.firstMessage)}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {formatDate(session.lastMessageAt)}
+                      {formatDate(session.lastAt || session.lastMessageAt)}
                     </p>
                   </div>
                   <Badge variant="secondary" className="ml-4 shrink-0">
