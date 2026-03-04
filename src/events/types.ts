@@ -42,10 +42,28 @@ export interface AgentResult {
   resumeId?: string;
 }
 
+export interface ActivityData {
+  id: number;
+  sessionId: string;
+  agentType: string;
+  activityType: 'tool_use' | 'skill_invoke' | 'agent_spawn' | 'memory_update';
+  toolName?: string;
+  detail?: Record<string, unknown>;
+  channelId?: string;
+  createdAt: number;
+}
+
+export interface MemoryUpdateData {
+  filePath: string;
+  source: 'dashboard' | 'agent' | 'external';
+}
+
 export interface EventMap {
   'message:incoming': { source: MessageSource; message: IncomingMessage };
   'message:outgoing': { target: MessageTarget; message: OutgoingMessage };
   'agent:stream': { sessionId: string; type: StreamType; data: StreamData };
   'agent:complete': { sessionId: string; result: AgentResult };
   'session:update': { sessionId: string; status: SessionStatus };
+  'activity:new': { activity: ActivityData };
+  'memory:update': { memory: MemoryUpdateData };
 }

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
+import { LiveStreamPanel } from './LiveStreamPanel';
 import type { AgentSessionSummary, AgentActivityItem } from '@/types/api';
 
 interface SessionDetailResponse extends AgentSessionSummary {
@@ -97,6 +98,11 @@ export function SessionDetail({ session }: SessionDetailProps) {
           </Button>
         )}
       </div>
+
+      {/* 실시간 스트리밍 패널 */}
+      {detail.status === 'active' && (
+        <LiveStreamPanel sessionId={detail.id} />
+      )}
 
       {/* 메타 정보 */}
       <Card>

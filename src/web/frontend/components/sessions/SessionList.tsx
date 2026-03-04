@@ -1,7 +1,8 @@
-import { ListTodo, Clock } from 'lucide-react';
+import { ListTodo, Clock, Radio } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { useAgentStreams } from '@/context/AgentStreamContext';
 import type { AgentSessionSummary } from '@/types/api';
 
 interface SessionListProps {
@@ -35,6 +36,8 @@ function formatTime(dateStr: string): string {
 }
 
 export function SessionList({ sessions, selectedId, onSelect }: SessionListProps) {
+  const { streams } = useAgentStreams();
+
   if (sessions.length === 0) {
     return (
       <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
@@ -49,6 +52,7 @@ export function SessionList({ sessions, selectedId, onSelect }: SessionListProps
         {sessions.map((session) => {
           const statusCfg = STATUS_BADGE[session.status];
           const isSelected = session.id === selectedId;
+          const isStreaming = session.status === 'active' && streams.has(session.id);
 
           return (
             <button
@@ -58,9 +62,13 @@ export function SessionList({ sessions, selectedId, onSelect }: SessionListProps
               className={cn(
                 'w-full rounded-lg border p-3 text-left transition-colors hover:bg-accent',
                 isSelected && 'border-primary bg-accent',
+                isStreaming && 'border-green-500/50',
               )}
             >
               <div className="flex items-center gap-2">
+                {isStreaming && (
+                  <Radio className="h-3 w-3 text-green-500 animate-pulse" />
+                )}
                 <Badge variant={statusCfg.variant} className="text-xs">
                   {statusCfg.label}
                 </Badge>

@@ -50,6 +50,18 @@ export function setupWebSocket(server: Server): WebSocketServer {
     }
   });
 
+  bus.on('message:incoming', (payload) => {
+    broadcast({ event: 'message:incoming', source: payload.source, message: payload.message });
+  });
+
+  bus.on('activity:new', (payload) => {
+    broadcast({ event: 'activity:new', activity: payload.activity });
+  });
+
+  bus.on('memory:update', (payload) => {
+    broadcast({ event: 'memory:update', memory: payload.memory });
+  });
+
   return wss;
 }
 
