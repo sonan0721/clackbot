@@ -37,3 +37,10 @@ export function getEventBus(): EventBus {
   }
   return instance;
 }
+
+export function resetEventBus(): void {
+  if (instance) {
+    instance.removeAllListeners();
+    instance = null;
+  }
+}

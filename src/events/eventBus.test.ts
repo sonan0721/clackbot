@@ -1,7 +1,11 @@
-import { describe, it, expect, vi } from 'vitest';
-import { EventBus, getEventBus } from './eventBus.js';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { EventBus, getEventBus, resetEventBus } from './eventBus.js';
 
 describe('EventBus', () => {
+  afterEach(() => {
+    resetEventBus();
+  });
+
   it('타입 안전하게 이벤트를 발행하고 구독한다', () => {
     const bus = new EventBus();
     const handler = vi.fn();
@@ -54,5 +58,21 @@ describe('EventBus', () => {
     const bus1 = getEventBus();
     const bus2 = getEventBus();
     expect(bus1).toBe(bus2);
+  });
+
+  it('removeAllListeners로 모든 구독을 해제한다', () => {
+    const bus = new EventBus();
+    const handler = vi.fn();
+    bus.on('session:update', handler);
+    bus.removeAllListeners('session:update');
+    bus.emit('session:update', { sessionId: 'test-1', status: 'active' });
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('resetEventBus()로 싱글턴을 초기화한다', () => {
+    const bus1 = getEventBus();
+    resetEventBus();
+    const bus2 = getEventBus();
+    expect(bus1).not.toBe(bus2);
   });
 });
