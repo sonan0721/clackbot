@@ -45,7 +45,7 @@ Clackbot은 사용자의 **로컬 머신**에서 실행되며, **Claude Code Age
 | AI | `@anthropic-ai/claude-code` (Agent SDK) — Brain + Sub Agent 멀티에이전트 |
 | AI 라우팅 | Claude Code Skills (`.claude/skills/`) + Agents (`.claude/agents/`) |
 | CLI | `commander` |
-| 웹 대시보드 | `express` + Vue 3 SPA (Vite 빌드) |
+| 웹 대시보드 | `express` + React SPA (Vite 빌드) + WebSocket |
 | DB | `better-sqlite3` (대화 이력, 에이전트 세션, 활동 로그, 메모리 스냅샷) |
 | 설정 | `dotenv` + `zod` |
 | 빌드 | `tsx` (dev), `tsc` (build) |
@@ -60,11 +60,21 @@ clackbot/
 ├── bin/clackbot.ts              # CLI 엔트리포인트
 ├── src/
 │   ├── cli/                     # CLI 명령어 (init, login, start, doctor)
+│   ├── events/
+│   │   └── eventBus.ts          # 타입 안전 EventBus (중앙 이벤트 허브)
+│   ├── router/
+│   │   └── messageRouter.ts     # 순수 함수 라우팅 (사이드 이펙트 없음)
+│   ├── sources/
+│   │   ├── slackSource.ts       # Slack Bolt 이벤트 → EventBus
+│   │   └── webSocketSource.ts   # 대시보드 WebSocket → EventBus
+│   ├── sinks/
+│   │   ├── slackSink.ts         # EventBus → Slack (3초 디바운스 chat.update)
+│   │   └── webSocketSink.ts     # EventBus → 대시보드 (토큰 단위 스트리밍)
 │   ├── slack/                   # Slack Bolt App
 │   │   ├── app.ts               # Bolt App 팩토리 (Socket Mode)
 │   │   ├── client.ts            # 공유 Slack 클라이언트 싱글턴
 │   │   ├── listeners/           # 이벤트 핸들러 (appMention, directMessage)
-│   │   │   └── handler.ts       # Brain/Sub Agent 라우팅 핸들러
+│   │   │   └── handler.ts       # EventBus 연결 + 실행 오케스트레이션
 │   │   └── middleware/          # 접근 제어 (owner/public 모드)
 │   ├── agent/                   # Claude Agent SDK 연동
 │   │   ├── claude.ts            # Sub Agent query() 래퍼
@@ -73,10 +83,11 @@ clackbot/
 │   │   ├── permissions.ts       # createCanUseTool 팩토리 (역할 기반)
 │   │   └── tools/               # MCP 도구 (내장 + MCP 서버 + 플러그인 로더)
 │   │       └── builtin/         # 내장 도구 (brainMemory, slackPost, slackReadThread 등)
-│   ├── web/                     # 웹 대시보드 (Express + Vue 3 SPA)
+│   ├── web/                     # 웹 대시보드 (Express + React SPA)
 │   │   ├── server.ts
+│   │   ├── ws.ts                # WebSocket 서버 (실시간 스트리밍 + 채팅)
 │   │   ├── api/                 # REST API (sessions, activities, agents, memory 등)
-│   │   └── frontend/            # Vue 3 SFC (Vite 빌드)
+│   │   └── frontend/            # React SPA (Vite 빌드)
 │   ├── store/
 │   │   ├── conversations.ts     # SQLite 대화 이력 + 스키마 관리
 │   │   ├── agentSessions.ts     # 에이전트 세션 & 활동 CRUD
@@ -128,27 +139,45 @@ clackbot start
 
 ---
 
-## 5) 핵심 데이터 흐름 (Brain Agent v3)
+## 5) 핵심 데이터 흐름 (v4 — EventBus 아키텍처)
 
 ```
-Slack @봇이름 멘션/DM
-  → Bolt App (Socket Mode)
-  → accessControl (owner/public 모드, isOwner 판별)
-  → Slack 파일 다운로드 (첨부파일 있을 시)
-  → SessionManager (스레드별 세션, 멀티에이전트 지원)
-  → "생각 중..." 상태 메시지 게시
-  → 라우팅 판단:
-    ├─ 활성 Sub Agent 세션 있음 → queryAgent() (기존 세션 이어서)
-    ├─ channel 모드 (1회성) → queryAgent() (Brain 없이)
-    └─ DM/Thread → queryBrain() (Brain Agent 라우팅)
-  → Brain Agent:
-    ├─ 코어 메모리 로드 (memory.md, sessions.md)
-    ├─ Claude Code Skills 발동 (brain-router)
-    ├─ 간단한 요청 → 직접 답변
-    └─ 복잡한 작업 → Task 도구로 Sub Agent 생성
-  → 응답 저장 → chat.update()로 상태 메시지를 응답으로 교체
-  → 활동 로그 기록 (agent_activities)
+Slack 멘션/DM ─→ SlackSource ──┐
+                                ├──→ EventBus ──→ MessageRouter (순수 함수)
+대시보드 채팅 ─→ WebSocketSource┘         │              │
+                                          │    ┌─────────┼─────────┐
+                                          │    ▼         ▼         ▼
+                                          │ queryBrain queryAgent directReply
+                                          │    │         │
+                                          │    └────┬────┘
+                                          │         ▼
+                                          │  Agent SDK query() 스트리밍
+                                          │         │
+                                          │    agent:stream 이벤트
+                                          │    ┌────┴────┐
+                                          │    ▼         ▼
+                                          │ SlackSink  WebSocketSink
+                                          │ (3초 업데이트) (토큰 단위)
+                                          │
+                                          └──→ 활동 로그 (agent_activities)
 ```
+
+### 핵심 컴포넌트
+
+| 컴포넌트 | 역할 | 위치 |
+|----------|------|------|
+| **EventBus** | 모든 메시지/이벤트의 중앙 허브 | `src/events/eventBus.ts` |
+| **MessageRouter** | 순수 함수 라우팅 결정 (사이드 이펙트 없음) | `src/router/messageRouter.ts` |
+| **SlackSource** | Slack Bolt 이벤트 → EventBus | `src/sources/slackSource.ts` |
+| **WebSocketSource** | 대시보드 WebSocket → EventBus | `src/sources/webSocketSource.ts` |
+| **SlackSink** | EventBus → Slack (3초 디바운스 chat.update) | `src/sinks/slackSink.ts` |
+| **WebSocketSink** | EventBus → 대시보드 (토큰 단위 스트리밍) | `src/sinks/webSocketSink.ts` |
+
+### 실시간 스트리밍
+
+- **Slack**: 3초 디바운스로 중간 결과 표시 (thinking 요약, tool 사용 현황)
+- **대시보드**: WebSocket으로 토큰 단위 스트리밍 + thinking 전체 과정 표시
+- **양방향 미러링**: Slack ↔ 대시보드 대화 동기화
 
 ---
 
@@ -205,11 +234,12 @@ Owner DM으로 봇에게 자연어로 설치 요청하거나 수동으로 config
 
 ## 9) 웹 대시보드
 
-`clackbot start` 시 http://localhost:3847 에서 접근 가능. Vue 3 SPA 기반 모니터링 + 설정 대시보드.
+`clackbot start` 시 http://localhost:3847 에서 접근 가능. React SPA + WebSocket 기반 실시간 대시보드.
 
 | 페이지 | 내용 |
 |--------|------|
 | 홈 | 봇 상태, 활성 세션 요약, 최근 활동 타임라인, 최근 대화 |
+| **실시간 채팅** | **Slack 양방향 미러링, 토큰 단위 스트리밍, thinking/tool 실시간 표시** |
 | 대화 이력 | 세션(스레드)별 대화 목록, 클릭 시 상세 보기, 검색 |
 | 세션 관리 | Brain/Sub Agent 세션 목록 (상태 필터), 활동 로그, 세션 종료 |
 | 연동 툴 | 내장 도구 + MCP 서버 + Agents/Skills 목록 |
