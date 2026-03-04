@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { useChatStream } from '@/hooks/useChatStream';
 import { ChatMessage } from '@/components/chat/ChatMessage';
 import { StreamingIndicator } from '@/components/chat/StreamingIndicator';
@@ -8,8 +8,22 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function Chat() {
-  const { streams, connected } = useChatStream();
+  const { streams, connected, send } = useChatStream();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [input, setInput] = useState('');
+
+  const handleSend = () => {
+    if (!input.trim() || !connected) return;
+    send({ type: 'chat:send', text: input.trim() });
+    setInput('');
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
 
   // 새 메시지 시 자동 스크롤
   useEffect(() => {
@@ -58,15 +72,25 @@ export default function Chat() {
         </div>
       </ScrollArea>
 
-      {/* 채팅 입력 -- Phase 5에서 활성화 */}
+      {/* 채팅 입력 */}
       <div className="border-t p-4">
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-3xl mx-auto flex gap-2">
           <input
             type="text"
-            placeholder="Phase 5에서 활성화됩니다..."
-            disabled
-            className="w-full rounded-lg border px-4 py-2 text-sm bg-muted text-muted-foreground"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={connected ? '메시지를 입력하세요...' : '연결 중...'}
+            disabled={!connected}
+            className="flex-1 rounded-lg border px-4 py-2 text-sm bg-background"
           />
+          <button
+            onClick={handleSend}
+            disabled={!connected || !input.trim()}
+            className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50"
+          >
+            전송
+          </button>
         </div>
       </div>
     </div>
