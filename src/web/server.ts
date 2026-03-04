@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { loadConfig } from '../config/index.js';
 import { APP_VERSION } from '../config/paths.js';
 import { logger } from '../utils/logger.js';
+import { setupWebSocket } from './ws.js';
 import toolsRouter from './api/tools.js';
 import conversationsRouter from './api/conversations.js';
 import configRouter from './api/config.js';
@@ -75,6 +76,7 @@ export function startWebServer(port: number): Promise<void> {
     const app = createWebServer();
 
     const server = app.listen(port, () => {
+      setupWebSocket(server);
       logger.success(`웹 대시보드: http://localhost:${port}`);
       resolve();
     });
