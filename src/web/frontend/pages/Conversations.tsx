@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Search, ChevronLeft, Bot, User } from 'lucide-react';
+import { Search, ChevronLeft, Bot, User, Send } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useApiQuery } from '@/hooks/useApi';
+import { useAgentStreams } from '@/context/AgentStreamContext';
 import type { ConversationsResponse, Message } from '@/types/api';
 
 const PAGE_SIZE = 20;
@@ -38,6 +39,9 @@ export default function Conversations() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(0);
   const [selectedThread, setSelectedThread] = useState<string | null>(null);
+  const [chatInput, setChatInput] = useState('');
+  const { connected, send } = useAgentStreams();
+  const chatScrollRef = useRef<HTMLDivElement>(null);
 
   // 검색어 debounce
   const handleSearchChange = (value: string) => {
@@ -71,6 +75,24 @@ export default function Conversations() {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const messages = threadData?.messages ?? [];
 
+  const handleChatSend = () => {
+    if (!chatInput.trim() || !connected || !selectedThread) return;
+    send({ type: 'chat:send', text: chatInput.trim(), threadTs: selectedThread });
+    setChatInput('');
+  };
+
+  const handleChatKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleChatSend();
+    }
+  };
+
+  // 메시지 변경 시 자동 스크롤
+  useEffect(() => {
+    chatScrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
   // 채팅 상세 보기
   if (selectedThread) {
     return (
@@ -82,7 +104,7 @@ export default function Conversations() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setSelectedThread(null)}
+              onClick={() => { setSelectedThread(null); setChatInput(''); }}
             >
               <ChevronLeft className="h-4 w-4" />
               목록으로
@@ -153,9 +175,30 @@ export default function Conversations() {
                     )}
                   </div>
                 ))}
+                <div ref={chatScrollRef} />
               </div>
             )}
           </ScrollArea>
+
+          {/* 채팅 입력 */}
+          <div className="border-t p-4">
+            <div className="max-w-2xl mx-auto flex gap-2">
+              <Input
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={handleChatKeyDown}
+                placeholder={connected ? '이 대화에 메시지 보내기...' : '연결 중...'}
+                disabled={!connected}
+              />
+              <Button
+                onClick={handleChatSend}
+                disabled={!connected || !chatInput.trim()}
+                size="icon"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
         </div>
       </>
     );
