@@ -166,6 +166,7 @@ export function AgentStreamProvider({ children }: { children: ReactNode }) {
           }
           queryClient.invalidateQueries({ queryKey: ['sessions'] });
           queryClient.invalidateQueries({ queryKey: ['conversations'] });
+          queryClient.invalidateQueries({ queryKey: ['conversation-thread'] });
           break;
 
         // 세션 상태 변경
