@@ -339,6 +339,7 @@ export async function handleMessage(params: HandleMessageParams): Promise<void> 
       inputText,
       outputText: response.text,
       toolsUsed: response.toolsUsed,
+      source: 'slack',
     });
 
     logger.debug('응답 전송 완료');

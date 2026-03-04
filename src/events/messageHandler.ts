@@ -7,6 +7,7 @@ import { queryBrain } from '../agent/brain.js';
 import { queryAgent } from '../agent/claude.js';
 import { getLocalDir } from '../config/paths.js';
 import { getActiveSessions } from '../store/agentSessions.js';
+import { saveConversation } from '../store/conversations.js';
 import { logger } from '../utils/logger.js';
 import type { ActiveSession } from '../router/types.js';
 
@@ -78,6 +79,17 @@ export function setupMessageHandler(): void {
           response = { text: '요청을 처리할 수 없습니다.', toolsUsed: [] };
         }
       }
+
+      // 대화 기록 저장
+      saveConversation({
+        channelId: message.channelId,
+        threadTs: message.threadTs,
+        userId: message.userId,
+        inputText: message.text,
+        outputText: response.text,
+        toolsUsed: response.toolsUsed,
+        source: 'web',
+      });
 
       // 완료 이벤트 발행 (WebSocketSink가 대시보드에 전달)
       bus.emit('agent:complete', {

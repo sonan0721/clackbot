@@ -65,6 +65,7 @@ export interface SessionSummary {
   messageCount: number;
   lastMessageAt: string;
   lastAt: string;
+  source?: string;
 }
 
 export interface Message {
@@ -72,6 +73,7 @@ export interface Message {
   outputText: string;
   toolsUsed: string[];
   createdAt: string;
+  source?: string;
 }
 
 export interface ConversationsResponse {

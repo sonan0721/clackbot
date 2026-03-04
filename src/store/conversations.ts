@@ -29,6 +29,7 @@ export function initDatabase(cwd?: string): Database.Database {
       output_text TEXT,
       tools_used TEXT,
       project_id TEXT,
+      source TEXT DEFAULT 'slack',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
@@ -123,6 +124,13 @@ export function initDatabase(cwd?: string): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_snapshots_file ON memory_snapshots(file_path);
   `);
 
+  // source 컬럼 마이그레이션
+  try {
+    db.exec(`ALTER TABLE conversations ADD COLUMN source TEXT DEFAULT 'slack'`);
+  } catch {
+    // 이미 컬럼이 존재하면 무시
+  }
+
   logger.debug(`대화 DB 초기화: ${dbPath}`);
   return db;
 }
@@ -143,6 +151,7 @@ export interface ConversationRecord {
   inputText: string;
   outputText?: string;
   toolsUsed?: string[];
+  source?: 'slack' | 'web';
 }
 
 /** 대화 기록 저장 */
@@ -151,8 +160,8 @@ export function saveConversation(record: ConversationRecord): string {
   const id = uuidv4();
 
   const stmt = database.prepare(`
-    INSERT INTO conversations (id, channel_id, thread_ts, user_id, user_name, input_text, output_text, tools_used, project_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO conversations (id, channel_id, thread_ts, user_id, user_name, input_text, output_text, tools_used, project_id, source)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   stmt.run(
@@ -165,6 +174,7 @@ export function saveConversation(record: ConversationRecord): string {
     record.outputText ?? null,
     record.toolsUsed ? JSON.stringify(record.toolsUsed) : null,
     null,
+    record.source ?? 'slack',
   );
 
   return id;
@@ -180,6 +190,7 @@ export interface ConversationListItem {
   outputText: string | null;
   toolsUsed: string[];
   createdAt: string;
+  source: string;
 }
 
 /** 대화 이력 조회 (페이지네이션) */
@@ -219,6 +230,7 @@ export function getConversations(options: {
     output_text: string | null;
     tools_used: string | null;
     project_id: string | null;
+    source: string | null;
     created_at: string;
   }>;
 
@@ -232,6 +244,7 @@ export function getConversations(options: {
     outputText: row.output_text,
     toolsUsed: row.tools_used ? JSON.parse(row.tools_used) : [],
     createdAt: row.created_at,
+    source: row.source ?? 'slack',
   }));
 
   return { items, total };
@@ -246,6 +259,7 @@ export interface SessionSummary {
   messageCount: number;
   firstAt: string;
   lastAt: string;
+  source: string;
 }
 
 /** 세션(스레드) 목록 조회 — thread_ts로 그룹핑 */
@@ -298,7 +312,8 @@ export function getConversationSessions(options: {
            MIN(input_text) as first_message,
            COUNT(*) as message_count,
            MIN(created_at) as first_at,
-           MAX(created_at) as last_at
+           MAX(created_at) as last_at,
+           MIN(source) as source
     FROM conversations
     ${threadFilter}
     GROUP BY thread_ts
@@ -312,6 +327,7 @@ export function getConversationSessions(options: {
     message_count: number;
     first_at: string;
     last_at: string;
+    source: string | null;
   }>;
 
   const sessions: SessionSummary[] = rows.map(row => ({
@@ -322,6 +338,7 @@ export function getConversationSessions(options: {
     messageCount: row.message_count,
     firstAt: row.first_at,
     lastAt: row.last_at,
+    source: row.source ?? 'slack',
   }));
 
   return { sessions, total };
@@ -343,6 +360,7 @@ export function getSessionMessages(threadTs: string): ConversationListItem[] {
     output_text: string | null;
     tools_used: string | null;
     project_id: string | null;
+    source: string | null;
     created_at: string;
   }>;
 
@@ -356,6 +374,7 @@ export function getSessionMessages(threadTs: string): ConversationListItem[] {
     outputText: row.output_text,
     toolsUsed: row.tools_used ? JSON.parse(row.tools_used) : [],
     createdAt: row.created_at,
+    source: row.source ?? 'slack',
   }));
 }
 
@@ -523,6 +542,7 @@ export function getConversation(id: string): ConversationListItem | null {
     output_text: string | null;
     tools_used: string | null;
     project_id: string | null;
+    source: string | null;
     created_at: string;
   } | undefined;
 
@@ -538,5 +558,6 @@ export function getConversation(id: string): ConversationListItem | null {
     outputText: row.output_text,
     toolsUsed: row.tools_used ? JSON.parse(row.tools_used) : [],
     createdAt: row.created_at,
+    source: row.source ?? 'slack',
   };
 }

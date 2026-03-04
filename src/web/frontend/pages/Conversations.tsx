@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Search, ChevronLeft, Bot, User, Send } from 'lucide-react';
+import { Search, ChevronLeft, Bot, User, Send, Plus, Globe, MessageSquare as MessageSquareIcon } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -132,6 +132,11 @@ export default function Conversations() {
                       <div className="flex justify-end">
                         <div className="max-w-[75%]">
                           <div className="flex items-center justify-end gap-2 mb-1">
+                            {msg.source && (
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                                {msg.source === 'web' ? 'Web' : 'Slack'}
+                              </Badge>
+                            )}
                             <span className="text-xs text-muted-foreground">
                               {formatDate(msg.createdAt)}
                             </span>
@@ -213,14 +218,24 @@ export default function Conversations() {
       />
       <div className="p-6 space-y-4">
         {/* 검색 */}
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="대화 검색..."
-            value={search}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            className="pl-9"
-          />
+        <div className="flex items-center gap-3">
+          <div className="relative max-w-md flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="대화 검색..."
+              value={search}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <Button
+            size="sm"
+            onClick={() => setSelectedThread(`web-${Date.now()}`)}
+            disabled={!connected}
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            새 대화
+          </Button>
         </div>
 
         {/* 세션 목록 */}
@@ -251,9 +266,18 @@ export default function Conversations() {
                       {formatDate(session.lastAt || session.lastMessageAt)}
                     </p>
                   </div>
-                  <Badge variant="secondary" className="ml-4 shrink-0">
-                    {session.messageCount}건
-                  </Badge>
+                  <div className="flex items-center gap-2 ml-4 shrink-0">
+                    <Badge variant="outline" className="text-[10px]">
+                      {session.source === 'web' ? (
+                        <><Globe className="h-3 w-3 mr-0.5" />Web</>
+                      ) : (
+                        <><MessageSquareIcon className="h-3 w-3 mr-0.5" />Slack</>
+                      )}
+                    </Badge>
+                    <Badge variant="secondary">
+                      {session.messageCount}건
+                    </Badge>
+                  </div>
                 </CardContent>
               </Card>
             ))}
