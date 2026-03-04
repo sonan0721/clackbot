@@ -12,6 +12,7 @@ import { truncateText, markdownToMrkdwn } from '../../utils/slackFormat.js';
 import { logger } from '../../utils/logger.js';
 import { getEventBus } from '../../events/eventBus.js';
 import { routeMessage } from '../../router/messageRouter.js';
+import { SlackSink } from '../../sinks/slackSink.js';
 import type { IncomingMessage } from '../../events/types.js';
 import type { ActiveSession } from '../../router/types.js';
 
@@ -117,6 +118,13 @@ export async function handleMessage(params: HandleMessageParams): Promise<void> 
       sessionId = session.id;
       resumeId = session.resumeId;
       sessionMessageCount = session.messageCount;
+    }
+
+    // SlackSink: 실시간 스트리밍 업데이트 시작
+    let slackSink: SlackSink | undefined;
+    if (thinkingTs && mode !== 'channel') {
+      slackSink = new SlackSink(bus, client);
+      slackSink.startSession(sessionId, channelId, thinkingTs);
     }
 
     // Brain/Sub Agent 라우팅: 활성 Sub Agent 세션이 있는지 확인
@@ -277,6 +285,7 @@ export async function handleMessage(params: HandleMessageParams): Promise<void> 
 
     // 남은 타이머 정리
     if (updateTimer) clearTimeout(updateTimer);
+    if (slackSink) slackSink.dispose();
 
     // EventBus: 에이전트 완료 이벤트 발행
     bus.emit('agent:complete', {
