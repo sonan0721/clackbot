@@ -23,6 +23,7 @@ import {
   ListTodo,
   Wrench,
   Activity,
+  Radio,
   Settings,
   ChevronRight,
   Bot,
@@ -74,6 +75,15 @@ export function AppSidebar() {
                 >
                   <LayoutDashboard className="h-4 w-4" />
                   <span>대시보드</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={isActive('/chat')}
+                  onClick={() => navigate('/chat')}
+                >
+                  <Radio className="h-4 w-4" />
+                  <span>실시간 채팅</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

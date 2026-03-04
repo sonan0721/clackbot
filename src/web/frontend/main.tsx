@@ -21,6 +21,7 @@ const router = createHashRouter([
       { path: 'projects/:name/memory', lazy: () => import('./pages/Memory').then(m => ({ Component: m.default })) },
       { path: 'projects/:name/conversations', lazy: () => import('./pages/Conversations').then(m => ({ Component: m.default })) },
       { path: 'tools', lazy: () => import('./pages/Tools').then(m => ({ Component: m.default })) },
+      { path: 'chat', lazy: () => import('./pages/Chat').then(m => ({ Component: m.default })) },
       { path: 'activity', lazy: () => import('./pages/ActivityLog').then(m => ({ Component: m.default })) },
       { path: 'settings', lazy: () => import('./pages/Settings').then(m => ({ Component: m.default })) },
     ],
