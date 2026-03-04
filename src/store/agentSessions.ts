@@ -132,7 +132,7 @@ export function createAgentSession(params: CreateAgentSessionParams): AgentSessi
     now,
   );
 
-  return {
+  const session: AgentSession = {
     id,
     threadTs: params.threadTs,
     agentType: params.agentType,
@@ -146,6 +146,15 @@ export function createAgentSession(params: CreateAgentSessionParams): AgentSessi
     createdAt: now,
     lastActiveAt: now,
   };
+
+  // EventBus로 실시간 브로드캐스트
+  try {
+    getEventBus().emit('session:update', { sessionId: id, status: 'active' });
+  } catch {
+    // EventBus 미초기화 시 무시
+  }
+
+  return session;
 }
 
 /** ID로 세션 조회 */
@@ -265,6 +274,15 @@ export function updateAgentSession(id: string, updates: UpdateAgentSessionParams
 
   params.push(id);
   database.prepare(`UPDATE agent_sessions SET ${sets.join(', ')} WHERE id = ?`).run(...params);
+
+  // 상태 변경 시 실시간 브로드캐스트
+  if (updates.status) {
+    try {
+      getEventBus().emit('session:update', { sessionId: id, status: updates.status });
+    } catch {
+      // EventBus 미초기화 시 무시
+    }
+  }
 }
 
 // ─── Activity CRUD ───

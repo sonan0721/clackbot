@@ -21,7 +21,6 @@ import {
   FolderOpen,
   MessageSquare,
   Brain,
-  ListTodo,
   Wrench,
   Activity,
   Radio,
@@ -199,15 +198,6 @@ export function AppSidebar() {
                       <SidebarMenuSub>
                         <SidebarMenuSubItem>
                           <SidebarMenuSubButton
-                            isActive={isActive(`/projects/${name}/sessions`)}
-                            onClick={() => navigate(`/projects/${name}/sessions`)}
-                          >
-                            <ListTodo className="h-3.5 w-3.5" />
-                            <span>세션</span>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton
                             isActive={isActive(`/projects/${name}/memory`)}
                             onClick={() => navigate(`/projects/${name}/memory`)}
                           >
@@ -246,20 +236,11 @@ export function AppSidebar() {
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  isActive={isActive('/sessions')}
-                  onClick={() => navigate('/sessions')}
-                >
-                  <ListTodo className="h-4 w-4" />
-                  <span>전체 세션</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton
                   isActive={isActive('/conversations')}
                   onClick={() => navigate('/conversations')}
                 >
                   <MessageSquare className="h-4 w-4" />
-                  <span>전체 대화</span>
+                  <span>대화 이력</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>

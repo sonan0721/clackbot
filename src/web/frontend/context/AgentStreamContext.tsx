@@ -107,6 +107,7 @@ export function AgentStreamProvider({ children }: { children: ReactNode }) {
     sessions: new Map(),
   });
   const listenersRef = useRef<Set<EventListener>>(new Set());
+  const knownSessionsRef = useRef<Set<string>>(new Set());
 
   const addEventListener = useCallback((listener: EventListener) => {
     listenersRef.current.add(listener);
@@ -146,6 +147,11 @@ export function AgentStreamProvider({ children }: { children: ReactNode }) {
               sessionId: data.sessionId,
               toolName: data.data.toolName,
             });
+          }
+          // 새 세션의 첫 스트리밍 이벤트 → 세션 목록 즉시 갱신
+          if (data.sessionId && !knownSessionsRef.current.has(data.sessionId)) {
+            knownSessionsRef.current.add(data.sessionId);
+            queryClient.invalidateQueries({ queryKey: ['sessions'] });
           }
           break;
 
