@@ -93,9 +93,10 @@ export function createWebServer() {
   app.use('/api/activities', activitiesRouter);
   app.use('/api/agents', agentsRouter);
 
-  // 정적 파일 서빙 (Vite 빌드 출력)
+  // 정적 파일 서빙 (Vite 빌드 출력) — index: false로 index.html 자동 서빙 방지
+  // index.html은 아래 catch-all 라우트에서 토큰 주입 후 서빙
   const publicDir = path.resolve(__dirname, 'public');
-  app.use(express.static(publicDir));
+  app.use(express.static(publicDir, { index: false }));
 
   // SPA 라우팅 — index.html에 토큰 주입
   app.get('*', (_req, res) => {
