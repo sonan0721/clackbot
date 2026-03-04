@@ -4,6 +4,7 @@ import { checkAccess } from '../middleware/accessControl.js';
 import { stripBotMention } from '../../utils/slackFormat.js';
 import { downloadSlackFiles, cleanupFiles } from '../fileHandler.js';
 import { handleMessage, type ConversationMode } from './handler.js';
+import { emitSlackIncoming } from '../../sources/slackSource.js';
 import { logger } from '../../utils/logger.js';
 
 // @봇이름 멘션 이벤트 처리
@@ -68,6 +69,18 @@ export function registerAppMention(app: App): void {
     if (files && files.length > 0 && config.slack.botToken) {
       attachments = await downloadSlackFiles(files, config.slack.botToken);
     }
+
+    // 대시보드 미러링: Slack 메시지를 EventBus에 발행
+    emitSlackIncoming({
+      text: inputText,
+      userId,
+      channelId: event.channel,
+      threadTs,
+      isOwner,
+      mode,
+      attachments: attachments?.map(f => ({ name: f.name, path: f.path, mimeType: f.mimetype })),
+      threadMessages,
+    });
 
     // 메시지 처리
     try {

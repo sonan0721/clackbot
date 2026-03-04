@@ -3,6 +3,7 @@ import { loadConfig } from '../../config/index.js';
 import { checkAccess } from '../middleware/accessControl.js';
 import { downloadSlackFiles, cleanupFiles } from '../fileHandler.js';
 import { handleMessage } from './handler.js';
+import { emitSlackIncoming } from '../../sources/slackSource.js';
 import { logger } from '../../utils/logger.js';
 
 // DM(Direct Message) 이벤트 처리
@@ -71,6 +72,18 @@ export function registerDirectMessage(app: App): void {
         logger.warn(`스레드 컨텍스트 조회 실패: ${error}`);
       }
     }
+
+    // 대시보드 미러링: Slack DM을 EventBus에 발행
+    emitSlackIncoming({
+      text: inputText,
+      userId,
+      channelId,
+      threadTs,
+      isOwner,
+      mode: 'dm',
+      attachments: attachments?.map(f => ({ name: f.name, path: f.path, mimeType: f.mimetype })),
+      threadMessages,
+    });
 
     // 메시지 처리
     try {

@@ -3,6 +3,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import type { Server } from 'node:http';
 import { getEventBus } from '../events/eventBus.js';
+import { handleWebSocketMessage } from '../sources/webSocketSource.js';
 import { logger } from '../utils/logger.js';
 
 let wss: WebSocketServer | null = null;
@@ -18,7 +19,7 @@ export function setupWebSocket(server: Server): WebSocketServer {
     ws.on('message', (raw) => {
       try {
         const data = JSON.parse(raw.toString());
-        // Phase 5에서 message:incoming 처리 추가
+        handleWebSocketMessage(data);
         logger.debug('[WebSocket] 수신: ' + JSON.stringify(data));
       } catch {
         logger.warn('[WebSocket] 잘못된 메시지 형식');
