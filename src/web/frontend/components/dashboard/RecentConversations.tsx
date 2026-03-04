@@ -27,6 +27,7 @@ export function RecentConversations() {
   const { data, isLoading } = useApiQuery<ConversationsResponse>(
     ['conversations', 'recent'],
     '/api/conversations?limit=5',
+    { staleTime: 5_000 },
   );
 
   return (
@@ -51,7 +52,7 @@ export function RecentConversations() {
               {data.sessions.map((session) => (
                 <li
                   key={session.threadTs}
-                  className="rounded-lg border p-3"
+                  className="rounded-lg border p-3 animate-in slide-in-from-top-2 fade-in duration-300"
                 >
                   <p className="text-sm leading-snug">
                     {truncate(session.firstMessage, 80)}
@@ -61,7 +62,7 @@ export function RecentConversations() {
                       <MessageSquare className="h-3 w-3" />
                       {session.messageCount}
                     </span>
-                    <span>{formatRelativeTime(session.lastMessageAt)}</span>
+                    <span>{formatRelativeTime((session as any).lastAt || session.lastMessageAt)}</span>
                   </div>
                 </li>
               ))}

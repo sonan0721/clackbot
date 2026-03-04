@@ -4,6 +4,7 @@ interface StreamingIndicatorProps {
 
 export function StreamingIndicator({ text }: StreamingIndicatorProps) {
   if (!text) return null;
+  const safeText = typeof text === 'string' ? text : JSON.stringify(text);
   return (
     <div className="flex gap-3">
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
@@ -11,7 +12,7 @@ export function StreamingIndicator({ text }: StreamingIndicatorProps) {
       </div>
       <div className="max-w-[80%] px-4 py-3 rounded-lg border bg-card">
         <p className="text-sm whitespace-pre-wrap">
-          {text}
+          {safeText}
           <span className="inline-block w-1.5 h-4 bg-primary ml-0.5 animate-pulse" />
         </p>
       </div>

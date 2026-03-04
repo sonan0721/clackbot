@@ -43,6 +43,8 @@ export function setupMessageHandler(): void {
 
       let response: { text: string; toolsUsed: string[]; resumeId?: string };
 
+      let completionSessionId = message.threadTs;
+
       switch (route.action) {
         case 'brain': {
           const brainResult = await queryBrain({
@@ -55,6 +57,7 @@ export function setupMessageHandler(): void {
               logger.debug(`[MessageHandler] 진행: ${status}`);
             },
           });
+          completionSessionId = brainResult.sessionId ?? message.threadTs;
           response = { text: brainResult.text, toolsUsed: brainResult.toolsUsed };
           break;
         }
@@ -78,7 +81,7 @@ export function setupMessageHandler(): void {
 
       // 완료 이벤트 발행 (WebSocketSink가 대시보드에 전달)
       bus.emit('agent:complete', {
-        sessionId: message.threadTs,
+        sessionId: completionSessionId,
         result: { text: response.text, toolsUsed: response.toolsUsed, resumeId: response.resumeId },
       });
 

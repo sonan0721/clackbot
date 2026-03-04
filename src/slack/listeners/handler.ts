@@ -253,6 +253,8 @@ export async function handleMessage(params: HandleMessageParams): Promise<void> 
             onProgress,
           });
           // Brain 결과를 공통 응답 형식으로 변환
+          // brainSessionId를 저장하여 agent:complete에서 동일 ID 사용
+          sessionId = brainResult.sessionId ?? sessionId;
           response = {
             text: brainResult.text,
             toolsUsed: brainResult.toolsUsed,

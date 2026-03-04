@@ -32,6 +32,7 @@ export function ActivityTimeline() {
   const { data: activities, isLoading } = useApiQuery<AgentActivityItem[]>(
     ['activities', 'recent'],
     '/api/activities?limit=20',
+    { staleTime: 5_000 },
   );
 
   return (
@@ -58,7 +59,7 @@ export function ActivityTimeline() {
                 return (
                   <li
                     key={activity.id}
-                    className="flex items-start gap-3 text-sm"
+                    className="flex items-start gap-3 text-sm animate-in slide-in-from-top-2 fade-in duration-300"
                   >
                     <span className="mt-0.5 shrink-0 text-xs text-muted-foreground">
                       {formatRelativeTime(activity.createdAt)}
@@ -74,7 +75,11 @@ export function ActivityTimeline() {
                         <span className="font-medium">{activity.toolName}</span>
                       )}
                       {activity.toolName && activity.detail && ' — '}
-                      {activity.detail}
+                      {typeof activity.detail === 'string'
+                        ? activity.detail
+                        : activity.detail
+                          ? JSON.stringify(activity.detail)
+                          : null}
                     </span>
                   </li>
                 );

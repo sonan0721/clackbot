@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useApiQuery } from '@/hooks/useApi';
+import { useAgentStreams } from '@/context/AgentStreamContext';
 import type { AgentActivityItem } from '@/types/api';
 
 const PAGE_SIZE = 30;
@@ -48,11 +49,13 @@ function formatDateTime(dateStr: string): string {
 export default function ActivityLog() {
   const [filter, setFilter] = useState<ActivityFilter>('all');
   const [page, setPage] = useState(0);
+  const { connected } = useAgentStreams();
 
-  // 전체 데이터를 충분히 가져와서 클라이언트 필터링
+  // 첫 페이지는 실시간 캐시 무효화로 자동 갱신
   const { data: activities, isLoading } = useApiQuery<AgentActivityItem[]>(
     ['activities', 'all', String(page)],
     `/api/activities?limit=${PAGE_SIZE}&offset=${page * PAGE_SIZE}`,
+    { staleTime: page === 0 ? 5_000 : 30_000 },
   );
 
   const allActivities = activities ?? [];
@@ -69,7 +72,16 @@ export default function ActivityLog() {
 
   return (
     <>
-      <PageHeader title="활동 로그" />
+      <PageHeader
+        title="활동 로그"
+        actions={
+          connected && page === 0 ? (
+            <Badge variant="default" className="bg-green-600 text-xs animate-pulse">
+              실시간
+            </Badge>
+          ) : undefined
+        }
+      />
       <div className="p-6">
         <Tabs value={filter} onValueChange={handleFilterChange}>
           <TabsList>
@@ -96,7 +108,7 @@ export default function ActivityLog() {
                 {filtered.map((activity) => {
                   const config = ACTIVITY_TYPE_CONFIG[activity.activityType];
                   return (
-                    <Card key={activity.id}>
+                    <Card key={activity.id} className="animate-in slide-in-from-top-2 fade-in duration-300">
                       <CardContent className="flex items-start gap-4 py-3">
                         <span className="shrink-0 text-xs text-muted-foreground whitespace-nowrap pt-0.5">
                           {formatDateTime(activity.createdAt)}
@@ -122,7 +134,9 @@ export default function ActivityLog() {
                           </div>
                           {activity.detail && (
                             <p className="text-sm text-muted-foreground mt-1 break-words">
-                              {activity.detail}
+                              {typeof activity.detail === 'string'
+                                ? activity.detail
+                                : JSON.stringify(activity.detail)}
                             </p>
                           )}
                         </div>
