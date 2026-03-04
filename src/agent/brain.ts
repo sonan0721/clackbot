@@ -8,6 +8,7 @@ import {
   logActivity,
 } from '../store/agentSessions.js';
 import { logger } from '../utils/logger.js';
+import { getEventBus } from '../events/eventBus.js';
 
 // ─── Brain Agent 모듈 ───
 // 글로벌 비서 역할의 Brain Agent. 메모리 관리, 라우팅 판단, Sub Agent 감독.
@@ -267,6 +268,9 @@ export async function queryBrain(params: BrainQueryParams): Promise<BrainQueryRe
       },
     });
 
+    // EventBus (스트리밍 이벤트 발행용)
+    const bus = getEventBus();
+
     // 진행 상태 추적
     const activities: string[] = [];
     const pushActivity = (line: string) => {
@@ -330,6 +334,12 @@ export async function queryBrain(params: BrainQueryParams): Promise<BrainQueryRe
               if (firstLine) {
                 pushActivity(`💬 ${firstLine}`);
               }
+              // EventBus: 텍스트 토큰 이벤트 발행
+              bus.emit('agent:stream', {
+                sessionId: session.id,
+                type: 'token',
+                data: { content: block.text },
+              });
             }
 
             // 도구 사용 추적 + 활동 로깅
@@ -345,6 +355,47 @@ export async function queryBrain(params: BrainQueryParams): Promise<BrainQueryRe
                 activityType: 'tool_use',
                 toolName: block.name,
                 detail: block.input ? { input: block.input } : undefined,
+              });
+
+              // EventBus: 도구 사용 이벤트 발행
+              bus.emit('agent:stream', {
+                sessionId: session.id,
+                type: 'tool_use',
+                data: { toolName: block.name },
+              });
+            }
+          }
+        }
+      }
+
+      // user 메시지의 tool_result 블록에서 도구 결과 이벤트 발행
+      if (message.type === 'user') {
+        const userMsg = message as SDKMessage & {
+          message?: {
+            content?: Array<{
+              type: string;
+              tool_use_id?: string;
+              content?: string | Array<{ type: string; text?: string }>;
+            }>;
+          };
+        };
+        if (userMsg.message?.content) {
+          for (const block of userMsg.message.content) {
+            if (block.type === 'tool_result') {
+              let resultText: string | undefined;
+              if (typeof block.content === 'string') {
+                resultText = block.content;
+              } else if (Array.isArray(block.content)) {
+                const textParts: string[] = [];
+                for (const c of block.content) {
+                  if (c.type === 'text' && c.text) textParts.push(c.text);
+                }
+                resultText = textParts.join('\n');
+              }
+              bus.emit('agent:stream', {
+                sessionId: session.id,
+                type: 'tool_result',
+                data: { toolResult: resultText?.slice(0, 500) },
               });
             }
           }

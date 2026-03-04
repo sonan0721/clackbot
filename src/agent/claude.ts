@@ -4,6 +4,7 @@ import { createCanUseTool } from './permissions.js';
 import { getMcpServers } from './tools/loader.js';
 import { loadConfig } from '../config/index.js';
 import { logger } from '../utils/logger.js';
+import { getEventBus } from '../events/eventBus.js';
 import type { ConversationMode } from '../slack/listeners/handler.js';
 import type { ProjectContext } from './projectContext.js';
 
@@ -133,6 +134,9 @@ export async function queryAgent(params: QueryParams): Promise<QueryResult> {
       },
     });
 
+    // EventBus (스트리밍 이벤트 발행용)
+    const bus = getEventBus();
+
     // 진행 상태 추적 (최근 활동 기록)
     const activities: string[] = [];
     const pushActivity = (line: string) => {
@@ -198,12 +202,59 @@ export async function queryAgent(params: QueryParams): Promise<QueryResult> {
               if (firstLine) {
                 pushActivity(`💬 ${firstLine}`);
               }
+              // EventBus: 텍스트 토큰 이벤트 발행
+              bus.emit('agent:stream', {
+                sessionId: params.sessionId,
+                type: 'token',
+                data: { content: block.text },
+              });
             }
             // 도구 사용 추적 + 진행 상태 보고
             if (block.type === 'tool_use' && block.name) {
               toolsUsed.push(block.name);
               const toolLabel = formatToolActivity(block.name, block.input);
               pushActivity(toolLabel);
+              // EventBus: 도구 사용 이벤트 발행
+              bus.emit('agent:stream', {
+                sessionId: params.sessionId,
+                type: 'tool_use',
+                data: { toolName: block.name },
+              });
+            }
+          }
+        }
+      }
+
+      // user 메시지의 tool_result 블록에서 도구 결과 이벤트 발행
+      if (message.type === 'user') {
+        const userMsg = message as SDKMessage & {
+          message?: {
+            content?: Array<{
+              type: string;
+              tool_use_id?: string;
+              content?: string | Array<{ type: string; text?: string }>;
+            }>;
+          };
+        };
+        if (userMsg.message?.content) {
+          for (const block of userMsg.message.content) {
+            if (block.type === 'tool_result') {
+              // tool_result의 content를 문자열로 추출
+              let resultText: string | undefined;
+              if (typeof block.content === 'string') {
+                resultText = block.content;
+              } else if (Array.isArray(block.content)) {
+                const textParts: string[] = [];
+                for (const c of block.content) {
+                  if (c.type === 'text' && c.text) textParts.push(c.text);
+                }
+                resultText = textParts.join('\n');
+              }
+              bus.emit('agent:stream', {
+                sessionId: params.sessionId,
+                type: 'tool_result',
+                data: { toolResult: resultText?.slice(0, 500) },
+              });
             }
           }
         }
