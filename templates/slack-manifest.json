@@ -28,6 +28,7 @@
         "im:read",
         "im:write",
         "files:read",
+        "files:write",
         "reactions:write",
         "users:read"
       ]

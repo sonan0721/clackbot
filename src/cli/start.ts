@@ -11,6 +11,7 @@ import { initDatabase, closeDatabase } from '../store/conversations.js';
 import { initBrainMemory } from '../store/brainMemory.js';
 import { setSlackClient } from '../agent/tools/builtin/slackPost.js';
 import { setSlackClientForDm } from '../agent/tools/builtin/slackSendDm.js';
+import { setSlackClientForUpload } from '../agent/tools/builtin/slackUploadFile.js';
 import { setSharedSlackClient } from '../slack/client.js';
 import semver from 'semver';
 import { logger } from '../utils/logger.js';
@@ -268,6 +269,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
     // Slack 클라이언트를 내장 도구 및 공유 싱글턴에 주입
     setSlackClient(app.client as unknown as Parameters<typeof setSlackClient>[0]);
     setSlackClientForDm(app.client as unknown as Parameters<typeof setSlackClientForDm>[0]);
+    setSlackClientForUpload(app.client as unknown as Parameters<typeof setSlackClientForUpload>[0]);
     setSharedSlackClient(app.client);
 
     await startSlackApp(app);

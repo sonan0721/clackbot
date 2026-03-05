@@ -341,7 +341,7 @@ Owner DM으로 봇에게 자연어로 설치 요청하거나 수동으로 config
 
 ## 17) Slack 앱 필요 권한
 
-**Bot Token Scopes**: `app_mentions:read`, `channels:history`, `channels:read`, `chat:write`, `files:read`, `groups:history`, `groups:read`, `im:history`, `im:read`, `im:write`, `reactions:write`, `users:read`
+**Bot Token Scopes**: `app_mentions:read`, `channels:history`, `channels:read`, `chat:write`, `files:read`, `files:write`, `groups:history`, `groups:read`, `im:history`, `im:read`, `im:write`, `reactions:write`, `users:read`
 
 **Event Subscriptions**: `app_mention`, `message.im`
 

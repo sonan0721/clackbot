@@ -24,6 +24,7 @@
 | `slack_post` | Slack 채널에 메시지 전송 |
 | `slack_send_dm` | Slack 사용자에게 DM 전송 |
 | `slack_read_channel` | Slack 채널의 최근 메시지 읽기 |
+| `slack_upload_file` | Slack 채널에 파일(이미지 등) 업로드 |
 | `memory_read` | 메모리(memory.md) 읽기 |
 | `memory_write` | 메모리에 내용 추가 |
 

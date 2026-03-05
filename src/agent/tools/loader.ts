@@ -9,6 +9,7 @@ import { slackPostTool } from './builtin/slackPost.js';
 import { slackReadChannelTool } from './builtin/slackReadChannel.js';
 import { slackReadThreadTool } from './builtin/slackReadThread.js';
 import { slackSendDmTool } from './builtin/slackSendDm.js';
+import { slackUploadFileTool } from './builtin/slackUploadFile.js';
 import { memoryReadTool, memoryWriteTool } from './builtin/memory.js';
 import { brainTools, setBrainCwd } from './builtin/brainMemory.js';
 import { logger } from '../../utils/logger.js';
@@ -217,7 +218,7 @@ export function getMcpServers(cwd?: string): Record<string, McpServerConfig> {
   servers['_builtin'] = createSdkMcpServer({
     name: 'clackbot-builtin',
     version: '1.0.0',
-    tools: [slackPostTool, slackReadChannelTool, slackReadThreadTool, slackSendDmTool, memoryReadTool, memoryWriteTool, ...brainTools],
+    tools: [slackPostTool, slackReadChannelTool, slackReadThreadTool, slackSendDmTool, slackUploadFileTool, memoryReadTool, memoryWriteTool, ...brainTools],
   });
 
   // config.mcpServers에서 MCP 서버 로드 (stdio/sse/http)
