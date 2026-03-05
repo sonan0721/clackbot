@@ -6,7 +6,6 @@ import { sessionManager } from '../../session/manager.js';
 import { saveConversation } from '../../store/conversations.js';
 import { getAgentSessionByThread } from '../../store/agentSessions.js';
 import { initBrainMemory } from '../../store/brainMemory.js';
-import { getLocalDir } from '../../config/paths.js';
 import { loadConfig } from '../../config/index.js';
 import { truncateText, markdownToMrkdwn } from '../../utils/slackFormat.js';
 import { logger } from '../../utils/logger.js';
@@ -79,7 +78,7 @@ export async function handleMessage(params: HandleMessageParams): Promise<void> 
   let updateTimer: ReturnType<typeof setTimeout> | null = null;
 
   try {
-    const cwd = getLocalDir();
+    const cwd = process.cwd();
 
     // 프로젝트 태그 파싱: "[dev] API 추가해줘" → 프로젝트 컨텍스트 로드
     const projectResult = resolveProjectContext(inputText);

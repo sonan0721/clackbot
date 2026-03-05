@@ -5,7 +5,6 @@ import { getEventBus } from './eventBus.js';
 import { routeMessage } from '../router/messageRouter.js';
 import { queryBrain } from '../agent/brain.js';
 import { queryAgent } from '../agent/claude.js';
-import { getLocalDir } from '../config/paths.js';
 import { getActiveSessions } from '../store/agentSessions.js';
 import { saveConversation } from '../store/conversations.js';
 import { logger } from '../utils/logger.js';
@@ -26,7 +25,7 @@ export function setupMessageHandler(): void {
     logger.info(`[MessageHandler] 웹 메시지 처리: ${message.text.slice(0, 50)}`);
 
     try {
-      const cwd = getLocalDir();
+      const cwd = process.cwd();
 
       // 활성 세션 조회
       const dbSessions = getActiveSessions();
